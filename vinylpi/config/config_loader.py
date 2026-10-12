@@ -1,7 +1,7 @@
 import json
 from copy import deepcopy
 from pathlib import Path
-from vinylpi.paths import CONFIG_PATH, get_active_config_path
+from vinylpi.paths import BASE_DIR, CONFIG_PATH, get_active_config_path
 from vinylpi.core.display_layout import normalize_image_config
 
 _LEGACY_CONFIG_PATH = CONFIG_PATH
@@ -86,9 +86,9 @@ CONFIG_DEFAULTS = {
     },
     "fallback": {
         "enabled": True,
-        "image_path": "assets/fallback/Fallback.png",
+        "image_path": "assets/fallback/normal/Fallback.png",
         "side_flip_enabled": True,
-        "side_flip_image_path": "assets/fallback/turn_record.png",
+        "side_flip_image_path": "assets/fallback/turn/turn_record.png",
         "allowed_failures": 3
     },
     "behavior": {
@@ -154,6 +154,23 @@ def load_config(path: Path | str | None = None) -> dict:
         pass
     except Exception:
         pass
+
+    # Existing profile settings may still reference fallback files from before
+    # normal/ and turn/ galleries were split. Redirect only when an identically
+    # named file exists in the corresponding new directory. Never overwrite a
+    # custom selection or change the file on disk.
+    fallback = cfg.get("fallback")
+    if isinstance(fallback, dict):
+        for field, folder in (("image_path", "normal"), ("side_flip_image_path", "turn")):
+            selected = fallback.get(field)
+            if not isinstance(selected, str):
+                continue
+            legacy_path = Path(selected)
+            if legacy_path.parent != Path("assets/fallback"):
+                continue
+            new_path = Path("assets/fallback") / folder / legacy_path.name
+            if (BASE_DIR / new_path).is_file():
+                fallback[field] = new_path.as_posix()
 
     cfg["image"] = normalize_image_config(cfg.get("image"))
 

@@ -18,7 +18,6 @@ class StopWebhookTests(unittest.TestCase):
                 "use_ha": True,
                 "base_url": "http://homeassistant:8123/",
                 "webhook_id": "rgb-webhook",
-                "replay_on_stop_enabled": True,
                 "stop_webhook_id": "stop-only-webhook",
             }
         }
@@ -37,7 +36,7 @@ class StopWebhookTests(unittest.TestCase):
     @patch("vinylpi.integrations.home_assistant._session.post")
     @patch("vinylpi.integrations.home_assistant.read_config")
     def test_disabled_does_not_send(self, read_config, post):
-        self.cfg["homeassistant"]["replay_on_stop_enabled"] = False
+        self.cfg["homeassistant"]["use_ha"] = False
         read_config.return_value = self.cfg
         self.assertFalse(send_recognition_stopped(source="vinyl", reason="manual"))
         post.assert_not_called()

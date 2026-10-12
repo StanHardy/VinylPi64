@@ -1118,7 +1118,7 @@ async function loadConfig() {
     setSelectedImagePath(
         "sideFlipImage",
         "sideFlipImagePath",
-        fallback.side_flip_image_path || "assets/fallback/turn_record.png",
+        fallback.side_flip_image_path || "assets/fallback/turn/turn_record.png",
     );
     document.getElementById("fallbackAllowedFailures").value =
         fallback.allowed_failures ?? 3;
@@ -1317,7 +1317,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     fallback.side_flip_enabled =
         document.getElementById("sideFlipEnabled").checked;
     fallback.side_flip_image_path =
-        document.getElementById("sideFlipImage").value || "assets/fallback/turn_record.png";
+        document.getElementById("sideFlipImage").value || "assets/fallback/turn/turn_record.png";
     fallback.allowed_failures = Math.max(
         1,
         parseInt(document.getElementById("fallbackAllowedFailures").value, 10) || 3,

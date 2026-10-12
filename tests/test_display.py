@@ -10,7 +10,7 @@ from vinylpi.core.display import _overlay_side_letter
 
 class SideFlipImageTests(unittest.TestCase):
     def setUp(self):
-        self.template_path = Path("assets/fallback/turn_record.png")
+        self.template_path = Path("assets/fallback/turn/turn_record.png")
 
     def test_target_side_letter_is_inserted_only_in_badge_slot(self):
         template = Image.open(self.template_path).convert("RGB")

@@ -53,6 +53,40 @@ class ConfigLoaderTests(unittest.TestCase):
         self.assertEqual(cfg["audio"]["pickup_usage"]["start_confirm_seconds"], 3.0)
         self.assertEqual(cfg["audio"]["pickup_usage"]["stop_confirm_seconds"], 30.0)
 
+    def test_legacy_fallback_paths_are_redirected_to_existing_kind_folders(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            normal = base / "assets/fallback/normal/Fallback.png"
+            turn = base / "assets/fallback/turn/turn_record.png"
+            normal.parent.mkdir(parents=True)
+            turn.parent.mkdir(parents=True)
+            normal.write_bytes(b"existing")
+            turn.write_bytes(b"existing")
+            config = base / "config.json"
+            config.write_text(json.dumps({"fallback": {
+                "image_path": "assets/fallback/Fallback.png",
+                "side_flip_image_path": "assets/fallback/turn_record.png",
+            }}), encoding="utf-8")
+            with patch("vinylpi.config.config_loader.BASE_DIR", base):
+                loaded = load_config(config)
+
+            self.assertEqual(loaded["fallback"]["image_path"], "assets/fallback/normal/Fallback.png")
+            self.assertEqual(loaded["fallback"]["side_flip_image_path"], "assets/fallback/turn/turn_record.png")
+            self.assertEqual(json.loads(config.read_text(encoding="utf-8"))["fallback"]["image_path"],
+                             "assets/fallback/Fallback.png")
+
+    def test_legacy_fallback_path_without_matching_new_file_is_preserved(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = Path(temp_dir)
+            config = base / "config.json"
+            config.write_text(json.dumps({"fallback": {
+                "image_path": "assets/fallback/my-custom-image.png",
+            }}), encoding="utf-8")
+            with patch("vinylpi.config.config_loader.BASE_DIR", base):
+                loaded = load_config(config)
+            self.assertEqual(loaded["fallback"]["image_path"],
+                             "assets/fallback/my-custom-image.png")
+
     def test_load_config_returns_independent_defaults_for_missing_file(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             missing = Path(temp_dir) / "missing.json"
