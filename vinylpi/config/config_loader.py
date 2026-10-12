@@ -106,7 +106,10 @@ CONFIG_DEFAULTS = {
     "homeassistant": {
         "use_ha": True,
         "base_url": "",
-        "webhook_id": "vinylpi_cover_color"
+        "webhook_id": "vinylpi_cover_color",
+        # Separate webhook so existing RGB color automations remain untouched.
+        "replay_on_stop_enabled": False,
+        "stop_webhook_id": ""
     }
 }
 

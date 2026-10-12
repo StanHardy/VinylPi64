@@ -191,6 +191,9 @@ function syncDependentSettingStates() {
     syncFallbackStates();
     setDependentState("discoveryEnabled", "discovery-details");
     setDependentState("useHA", "ha-details");
+    setDependentState("haReplayOnStopEnabled", "ha-stop-details",
+        Boolean(document.getElementById("useHA")?.checked) &&
+        Boolean(document.getElementById("haReplayOnStopEnabled")?.checked));
     setDependentState("debugLogs", "debug-details");
     setDependentState("discogsEnabled", "discogs-details");
     setDependentState("vinylAutoWakeEnabled", "vinyl-auto-wake-details");
@@ -1004,6 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "sideFlipEnabled",
     "discoveryEnabled",
     "useHA",
+    "haReplayOnStopEnabled",
     "debugLogs",
     "discogsEnabled",
     "vinylAutoWakeEnabled",
@@ -1202,6 +1206,10 @@ async function loadConfig() {
         homeassistant.base_url || "";
     document.getElementById("webHookID").value =
         homeassistant.webhook_id || "";
+    document.getElementById("haReplayOnStopEnabled").checked =
+        !!homeassistant.replay_on_stop_enabled;
+    document.getElementById("haStopWebhookID").value =
+        homeassistant.stop_webhook_id || "";
 
     syncDependentSettingStates();
 }
@@ -1421,6 +1429,10 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("baseURL").value;
     homeassistant.webhook_id =
         document.getElementById("webHookID").value;
+    homeassistant.replay_on_stop_enabled =
+        document.getElementById("haReplayOnStopEnabled").checked;
+    homeassistant.stop_webhook_id =
+        document.getElementById("haStopWebhookID").value.trim();
 
     try {
         const response = await fetch("/api/config", {

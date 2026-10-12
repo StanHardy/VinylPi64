@@ -14,7 +14,7 @@ from vinylpi.core.spotify_stats import (
     update_spotify_genre,
 )
 from vinylpi.core.status import get_last_source_status, write_status
-from vinylpi.integrations.home_assistant import send_rgb
+from vinylpi.integrations.home_assistant import send_rgb, send_recognition_stopped
 from vinylpi.integrations.spotify_client import (
     SpotifyClient,
     SpotifyError,
@@ -155,6 +155,7 @@ def main() -> None:
                 if auto_sleep_enabled and consecutive_idle_polls >= auto_sleep_iterations:
                     print("Spotify has been idle for a while, entering sleep mode.")
                     show_fallback_image()
+                    send_recognition_stopped(source="spotify", reason="auto_sleep")
                     return
 
                 time.sleep(poll_seconds)
@@ -198,6 +199,8 @@ def main() -> None:
 
         except (SpotifyNotConfigured, SpotifyNotAuthorized) as exc:
             print(f"Spotify worker stopped: {exc}")
+            show_fallback_image()
+            send_recognition_stopped(source="spotify", reason="authorization")
             return
         except SpotifyError as exc:
             print(f"Spotify API error: {exc}")

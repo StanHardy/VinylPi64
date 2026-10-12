@@ -7,6 +7,7 @@ from vinylpi.core.audio_capture import record_sample
 from vinylpi.core.audio_standby import LowAudioSleepTracker, VinylAudioSleepConfig
 from vinylpi.core.pickup_usage import PickupUsageConfig, PickupUsageTracker, measure_wav_level
 from vinylpi.core.display import show_fallback_image
+from vinylpi.integrations.home_assistant import send_recognition_stopped
 from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.discogs_matcher import (
     apply_discogs_match,
@@ -90,6 +91,7 @@ def main_loop() -> None:
     timed_listen_state = TimedListenState()
     discogs_state = DiscogsPlaybackState()
     start_display_refresh_watcher(debug_log=cfg.debug_log)
+    stop_reason = None
 
     while True:
         try:
@@ -141,6 +143,7 @@ def main_loop() -> None:
                             "stopping recognition worker."
                         )
                     show_fallback_image()
+                    stop_reason = "audio_standby"
                     break
 
             track = recognize_song(wav_bytes)
@@ -184,6 +187,7 @@ def main_loop() -> None:
                 ):
                     if cfg.debug_log:
                         print("Vinyl auto-sleep reached; stopping recognition worker.")
+                    stop_reason = "auto_sleep"
                     break
                 time.sleep(cfg.delay)
                 continue
@@ -286,3 +290,8 @@ def main_loop() -> None:
             print(f"Error in loop: {exc}")
 
         time.sleep(cfg.delay)
+
+    # This process exits normally only after an automatic standby transition.
+    # Manual SIGTERM is handled by the dashboard process instead.
+    if stop_reason:
+        send_recognition_stopped(source="vinyl", reason=stop_reason)

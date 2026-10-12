@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261008-cover" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261012-ha-stop" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -638,6 +638,15 @@
                             <div data-setting-row="ha-details">
                                 <div class="form-row"><label for="baseURL">Base URL</label><input type="text" id="baseURL" placeholder="http://homeassistant:8123"></div>
                                 <div class="form-row"><label for="webHookID">Webhook ID</label><input type="text" id="webHookID" placeholder="vinylpi_cover_color"></div>
+                                <div class="group-title">When recognition stops</div>
+                                <label class="setting-toggle-label" for="haReplayOnStopEnabled">
+                                    <span>Replay selected Pixoo GIF in Home Assistant</span>
+                                    <input type="checkbox" id="haReplayOnStopEnabled">
+                                </label>
+                                <div data-setting-row="ha-stop-details">
+                                    <div class="form-row"><label for="haStopWebhookID">Stop webhook ID</label><input type="text" id="haStopWebhookID" placeholder="a long random webhook ID"></div>
+                                    <div class="form-hint">Sends a separate webhook when Vinyl or Spotify changes to Off (manually or through auto-sleep). Create a Home Assistant webhook automation that calls <code>script.pixoo_play_design</code>. See <code>docs/HA_STOP_REPLAY.md</code> in the project.</div>
+                                </div>
                             </div>
                         </div>
                     </div>
