@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from io import BytesIO
+from urllib.parse import quote
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
@@ -21,6 +22,8 @@ from vinylpi.paths import (
     BASE_DIR,
     FONTS_DIR,
     UPLOAD_DIR,
+    FALLBACK_NORMAL_DIR,
+    FALLBACK_TURN_DIR,
 )
 
 
@@ -47,27 +50,50 @@ def _safe_child_path(directory: Path, filename: str) -> Path | None:
 
 
 def _safe_upload_path(filename: str) -> Path | None:
-    return _safe_child_path(UPLOAD_DIR, filename)
+    """Support kind-specific uploads and legacy root files, without arbitrary paths."""
+    value = str(filename or "")
+    if "/" not in value:
+        return _safe_child_path(UPLOAD_DIR, value)
+    pieces = value.split("/")
+    if len(pieces) != 2 or pieces[0] not in {"normal", "turn"}:
+        return None
+    directory = FALLBACK_NORMAL_DIR if pieces[0] == "normal" else FALLBACK_TURN_DIR
+    return _safe_child_path(directory, pieces[1])
 
 
 def _safe_font_path(filename: str) -> Path | None:
     return _safe_child_path(FONTS_DIR, filename)
 
 
+def _legacy_fallback_kind(path: Path) -> str:
+    """Classify existing root-level images without moving configured files."""
+    name = path.stem.casefold()
+    return "turn" if name.startswith(("turn_record", "side_flip", "sideflip")) else "normal"
+
+
 def list_fallback_images(*, kind: str = "normal") -> list[dict]:
     selected_kind = normalize_fallback_kind(kind)
     current_path = get_current_fallback_path(kind=selected_kind)
+    selected_dir = FALLBACK_TURN_DIR if selected_kind == "turn" else FALLBACK_NORMAL_DIR
+    # Leave existing files in their original location so saved config paths work.
+    # New uploads are strictly separated; legacy root images are shown by kind.
+    candidates = list(selected_dir.glob("*"))
+    candidates.extend(
+        file for file in UPLOAD_DIR.glob("*")
+        if file.is_file() and _legacy_fallback_kind(file) == selected_kind
+    )
     files = []
-
-    for path in sorted(UPLOAD_DIR.glob("*"), key=lambda item: item.stat().st_mtime, reverse=True):
+    for path in sorted(candidates, key=lambda item: item.stat().st_mtime, reverse=True):
         if not path.is_file() or path.suffix.lower().lstrip(".") not in ALLOWED_EXT:
             continue
         relative_path = path.relative_to(BASE_DIR).as_posix()
+        delete_ref = path.relative_to(UPLOAD_DIR).as_posix()
         files.append(
             {
                 "filename": path.name,
+                "delete_ref": delete_ref,
                 "path": relative_path,
-                "url": f"/uploads/{path.name}",
+                "url": f"/uploads/{quote(delete_ref, safe='/')}",
                 "is_current": relative_path == current_path,
                 "kind": selected_kind,
             }
@@ -104,7 +130,9 @@ def upload_fallback_image(file_storage, *, kind: str = "normal"):
 
     prefix = "turn_record" if selected_kind == "turn" else "fallback"
     filename = f"{prefix}_{time.time_ns()}.{extension}"
-    destination = UPLOAD_DIR / filename
+    directory = FALLBACK_TURN_DIR if selected_kind == "turn" else FALLBACK_NORMAL_DIR
+    directory.mkdir(parents=True, exist_ok=True)
+    destination = directory / filename
     file_storage.save(destination)
 
     relative_path = destination.relative_to(BASE_DIR).as_posix()

@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261008-cover">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261012-layout2">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261012-ha-stop" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261012-layout2" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -60,7 +60,7 @@
                 </button>
                 <button type="button" class="mobile-settings-category" data-settings-target="section-debug">
                     <span class="mobile-settings-category-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 9h8"></path><path d="M9 4h6l1 3H8l1-3z"></path><rect x="6" y="7" width="12" height="13" rx="5"></rect><path d="M3 12h3"></path><path d="M18 12h3"></path><path d="M4 17h3"></path><path d="M17 17h3"></path></svg></span>
-                    <span><strong>Debug</strong><small>Logs and output paths</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
+                    <span><strong>Debug</strong><small>Diagnostics</small></span><span class="mobile-settings-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></span>
                 </button>
             </div>
         </section>
@@ -166,7 +166,7 @@
                                 </div>
 
                             </div>
-                            <div class="form-row">
+                            <div class="form-row audio-sample-rate-row">
                                 <label for="audioSampleRate">Sample rate</label>
                                 <input type="number" id="audioSampleRate">
                             </div>
@@ -506,7 +506,7 @@
                                     <div class="spotify-settings-status-copy" id="spotifySettingsStatusCopy">The connection belongs only to the currently active VinylPi profile.</div>
                                 </div>
                             </div>
-                            <span class="spotify-settings-profile-badge">Per profile</span>
+                            
                         </div>
 
                         <div class="form-group">
@@ -551,15 +551,15 @@
 
                 <section class="card settings-card" id="section-standby">
                     <button class="settings-card-header" type="button" aria-expanded="false">
-                        <span class="settings-card-title"><h2>Standby</h2><span>Automatic wake and energy saving</span></span>
+                        <span class="settings-card-title"><h2>Standby</h2><span>Automatic wake and sleep controls</span></span>
                         <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
                     </button>
                     <div class="settings-card-content">
                         <div class="form-group">
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Wake on audio</div>
-                                    <div class="setting-group-copy">Monitor the input while Off and start Vinyl when audio reaches the threshold.</div>
+                                    <div class="group-title">Auto wake</div>
+                                    <div class="setting-group-copy">Start Vinyl automatically when audio is detected while playback is Off.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="vinylAutoWakeEnabled">
                                     <span>Enabled</span>
@@ -574,11 +574,10 @@
                         </div>
 
                         <div class="form-group">
-                            <div class="group-title">Vinyl auto standby</div>
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Low audio level</div>
-                                    <div class="setting-group-copy">Enter standby after sustained low input.</div>
+                                    <div class="group-title">Auto sleep · Vinyl (silence)</div>
+                                    <div class="setting-group-copy">Stop Vinyl after the input stays below the threshold.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="vinylAudioSleepEnabled">
                                     <span>Enabled</span>
@@ -588,15 +587,15 @@
                             <div data-setting-row="vinyl-audio-sleep-details">
                                 <div class="form-row"><label for="vinylAudioSleepThreshold">Sleep threshold (dBFS)</label><input type="number" id="vinylAudioSleepThreshold" min="-120" max="-1" step="0.5"></div>
                                 <div class="form-row"><label for="vinylAudioSleepConfirmSeconds">Grace period (seconds)</label><input type="number" id="vinylAudioSleepConfirmSeconds" min="0.1" max="600" step="0.1"></div>
-                                <div class="form-hint">The grace period prevents short quiet sections from triggering standby.</div>
+                                <div class="form-hint">The delay avoids stopping during short pauses between tracks.</div>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Recognition failures</div>
-                                    <div class="setting-group-copy">Enter standby after repeated failed recognitions.</div>
+                                    <div class="group-title">Auto sleep · Vinyl (recognition)</div>
+                                    <div class="setting-group-copy">Stop Vinyl after repeated unsuccessful recognition attempts.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="vinylAutoSleepEnabled">
                                     <span>Enabled</span>
@@ -604,15 +603,15 @@
                                 </label>
                             </div>
                             <div data-setting-row="vinyl-auto-sleep-details">
-                                <div class="form-row"><label for="vinylAutoSleepIterations">Failed iterations</label><input type="number" id="vinylAutoSleepIterations" min="1" step="1"></div>
+                                <div class="form-row"><label for="vinylAutoSleepIterations">Failed recognitions</label><input type="number" id="vinylAutoSleepIterations" min="1" step="1"></div>
                             </div>
                         </div>
 
                         <div class="form-group">
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Spotify auto standby</div>
-                                    <div class="setting-group-copy">Enter standby after repeated idle polls.</div>
+                                    <div class="group-title">Auto sleep · Spotify</div>
+                                    <div class="setting-group-copy">Stop Spotify after repeated checks without an active track.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="spotifyAutoSleepEnabled">
                                     <span>Enabled</span>
@@ -620,7 +619,7 @@
                                 </label>
                             </div>
                             <div data-setting-row="spotify-auto-sleep-details">
-                                <div class="form-row"><label for="spotifyAutoSleepIterations">Idle polls</label><input type="number" id="spotifyAutoSleepIterations" min="1" step="1"></div>
+                                <div class="form-row"><label for="spotifyAutoSleepIterations">Idle checks</label><input type="number" id="spotifyAutoSleepIterations" min="1" step="1"></div>
                             </div>
                         </div>
                     </div>
@@ -628,25 +627,16 @@
 
                 <section class="card settings-card" id="section-ha">
                     <button class="settings-card-header" type="button" aria-expanded="false">
-                        <span class="settings-card-title"><h2>Home Assistant</h2><span>Optional HA integration and webhook</span></span>
+                        <span class="settings-card-title"><h2>Home Assistant</h2><span>Optional integration and webhooks</span></span>
                         <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
                     </button>
                     <div class="settings-card-content">
                         <div class="form-group">
-                            <div class="group-title">Integration</div>
                             <div class="form-row"><label for="useHA">Use HA Integration</label><input type="checkbox" id="useHA"></div>
                             <div data-setting-row="ha-details">
                                 <div class="form-row"><label for="baseURL">Base URL</label><input type="text" id="baseURL" placeholder="http://homeassistant:8123"></div>
-                                <div class="form-row"><label for="webHookID">Webhook ID</label><input type="text" id="webHookID" placeholder="vinylpi_cover_color"></div>
-                                <div class="group-title">When recognition stops</div>
-                                <label class="setting-toggle-label" for="haReplayOnStopEnabled">
-                                    <span>Replay selected Pixoo GIF in Home Assistant</span>
-                                    <input type="checkbox" id="haReplayOnStopEnabled">
-                                </label>
-                                <div data-setting-row="ha-stop-details">
-                                    <div class="form-row"><label for="haStopWebhookID">Stop webhook ID</label><input type="text" id="haStopWebhookID" placeholder="a long random webhook ID"></div>
-                                    <div class="form-hint">Sends a separate webhook when Vinyl or Spotify changes to Off (manually or through auto-sleep). Create a Home Assistant webhook automation that calls <code>script.pixoo_play_design</code>. See <code>docs/HA_STOP_REPLAY.md</code> in the project.</div>
-                                </div>
+                                <div class="form-row"><label for="webHookID">Webhook ID · Color sync</label><input type="text" id="webHookID" placeholder="vinylpi_cover_color"></div>
+                                <div class="form-row"><label for="haStopWebhookID">Webhook ID · On shutdown</label><input type="text" id="haStopWebhookID" placeholder="Enter a webhook ID"></div>
                             </div>
                         </div>
                     </div>
@@ -654,19 +644,15 @@
 
                 <section class="card settings-card" id="section-debug">
                     <button class="settings-card-header" type="button" aria-expanded="false">
-                        <span class="settings-card-title"><h2>Debug</h2><span>Logs and output paths</span></span>
+                        <span class="settings-card-title"><h2>Debug</h2><span>Optional diagnostics</span></span>
                         <span class="chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></span>
                     </button>
                     <div class="settings-card-content">
                         <div class="form-group">
-                            <div class="group-title">Logging</div>
-                            <div class="form-row"><label for="debugLogs">Debug logs enabled</label><input type="checkbox" id="debugLogs"></div>
-                        </div>
-                        <div class="form-group" data-setting-row="debug-details">
-                            <div class="group-title">Paths</div>
-                            <div class="form-row"><label for="debugPixooFramePath">Pixoo frame path</label><input type="text" id="debugPixooFramePath"></div>
-                            <div class="form-row"><label for="debugPreviewPath">Preview path</label><input type="text" id="debugPreviewPath"></div>
-                            <div class="form-row"><label for="debugWavPath">WAV path</label><input type="text" id="debugWavPath"></div>
+                            <div class="form-row"><label for="debugLogs">Debug logs</label><input type="checkbox" id="debugLogs"></div>
+                            <div class="form-row"><label for="debugPixooFrameEnabled">Save Pixoo frame</label><input type="checkbox" id="debugPixooFrameEnabled"></div>
+                            <div class="form-row"><label for="debugPreviewEnabled">Save preview</label><input type="checkbox" id="debugPreviewEnabled"></div>
+                            <div class="form-row"><label for="debugWavEnabled">Save recorded WAV</label><input type="checkbox" id="debugWavEnabled"></div>
                         </div>
                     </div>
                 </section>

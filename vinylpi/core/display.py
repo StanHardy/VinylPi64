@@ -14,6 +14,7 @@ from vinylpi.core.image_utils import (
 )
 from vinylpi.integrations.divoom_api import PixooClient, PixooError
 from vinylpi.config.runtime import read_config
+from vinylpi.paths import debug_output_path
 
 _scroll_thread: Optional[threading.Thread] = None
 _scroll_stop_event = threading.Event()
@@ -228,7 +229,7 @@ def _scroll_loop(
             pixoo_frame_path = debug_cfg.get("pixoo_frame_path") or ""
             preview_path = debug_cfg.get("preview_path") or ""
             if pixoo_frame_path:
-                frame.save(pixoo_frame_path)
+                frame.save(debug_output_path(pixoo_frame_path))
                 if debug_log:
                     print(f"Finished: {pixoo_frame_path} created.")
             if preview_path:
@@ -237,7 +238,7 @@ def _scroll_loop(
                     (canvas_size * scale, canvas_size * scale),
                     Image.Resampling.NEAREST,
                 )
-                preview.save(preview_path)
+                preview.save(debug_output_path(preview_path))
                 if debug_log:
                     print(f"Finished: {preview_path} created.")
             first_frame_saved = True

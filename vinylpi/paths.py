@@ -56,8 +56,21 @@ def get_active_display_refresh_path() -> Path:
 
 
 UPLOAD_DIR = BASE_DIR / "assets" / "fallback"
+FALLBACK_NORMAL_DIR = UPLOAD_DIR / "normal"
+FALLBACK_TURN_DIR = UPLOAD_DIR / "turn"
 FONTS_DIR = BASE_DIR / "assets" / "fonts"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+FALLBACK_NORMAL_DIR.mkdir(parents=True, exist_ok=True)
+FALLBACK_TURN_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def debug_output_path(configured_path: str) -> Path:
+    """Resolve a configured debug file relative to the project and prepare its directory."""
+    output = Path(configured_path)
+    if not output.is_absolute():
+        output = BASE_DIR / output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    return output
 
 ALLOWED_EXT = {"png", "jpg", "jpeg"}
 ALLOWED_FONT_EXT = {"ttf", "otf"}

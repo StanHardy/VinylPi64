@@ -282,7 +282,6 @@ body.random-record-open { overflow: hidden; }
 @media (max-width: 560px) {
     .main-header { gap: 12px; }
     .dashboard-heading { gap: 8px; }
-    .dashboard-heading .header-title { font-size: clamp(12px, 3.5vw, 18px); }
     .random-record-dialog { padding: 20px; border-radius: 20px; }
     .random-record-header h2 { font-size: 20px; }
 }

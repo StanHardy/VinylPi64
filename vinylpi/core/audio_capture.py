@@ -7,6 +7,7 @@ import sounddevice as sd
 import soundfile as sf
 
 from vinylpi.config.runtime import read_config
+from vinylpi.paths import debug_output_path
 
 
 def _safe_int(value, default: int = 0) -> int:
@@ -225,7 +226,7 @@ def record_sample(seconds_override: float | None = None) -> bytes | None:
 
     if debug_wav_path:
         try:
-            sf.write(debug_wav_path, audio, sample_rate, format="WAV")
+            sf.write(str(debug_output_path(debug_wav_path)), audio, sample_rate, format="WAV")
             if debug_log:
                 print(f"Saved WAV file at: {debug_wav_path}")
         except Exception as exc:

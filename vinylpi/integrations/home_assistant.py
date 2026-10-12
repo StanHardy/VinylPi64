@@ -55,18 +55,17 @@ def send_rgb(rgb: tuple[int, int, int]) -> None:
 def send_recognition_stopped(*, source: str, reason: str) -> bool:
     """Best-effort notification of an Off transition to a *separate* HA webhook.
 
-    HA must have a webhook automation that calls script.pixoo_play_design.
+    HA decides how to handle this event (for example by starting a script).
     This deliberately never reuses the RGB webhook: the RGB payload is
     different and its existing automation must not be triggered on stop.
     """
     ha_cfg = read_config().get("homeassistant") or {}
-    if not ha_cfg.get("use_ha", False) or not ha_cfg.get("replay_on_stop_enabled", False):
+    if not ha_cfg.get("use_ha", False):
         return False
 
     base_url = str(ha_cfg.get("base_url") or "").strip().rstrip("/")
     webhook_id = str(ha_cfg.get("stop_webhook_id") or "").strip()
     if not base_url or not webhook_id:
-        print("[HA] Stop replay enabled but Base URL or Stop webhook ID is missing.")
         return False
 
     try:

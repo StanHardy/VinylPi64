@@ -2266,3 +2266,6 @@ body.mobile-display-preview-open {
     outline-offset: -2px;
 }
 .cover-source-segmented input:disabled { cursor: not-allowed; }
+
+/* Keep the sampling settings visually separate from the adaptive stages. */
+.audio-sample-rate-row { margin-top: 12px; }

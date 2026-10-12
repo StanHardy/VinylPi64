@@ -107,8 +107,7 @@ CONFIG_DEFAULTS = {
         "use_ha": True,
         "base_url": "",
         "webhook_id": "vinylpi_cover_color",
-        # Separate webhook so existing RGB color automations remain untouched.
-        "replay_on_stop_enabled": False,
+        # Dedicated Off-event webhook; an empty ID disables only this event.
         "stop_webhook_id": ""
     }
 }
@@ -163,6 +162,11 @@ def load_config(path: Path | str | None = None) -> dict:
     discogs = cfg.get("discogs")
     if isinstance(discogs, dict):
         discogs.pop("token", None)
+
+    # The two HA webhooks now share the master switch; retire the old stop toggle.
+    homeassistant = cfg.get("homeassistant")
+    if isinstance(homeassistant, dict):
+        homeassistant.pop("replay_on_stop_enabled", None)
 
     # Older builds used a time-based repeat guard. Statistics are now strictly
     # transition-based, so keeping this legacy value would be misleading.

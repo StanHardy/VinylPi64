@@ -191,10 +191,6 @@ function syncDependentSettingStates() {
     syncFallbackStates();
     setDependentState("discoveryEnabled", "discovery-details");
     setDependentState("useHA", "ha-details");
-    setDependentState("haReplayOnStopEnabled", "ha-stop-details",
-        Boolean(document.getElementById("useHA")?.checked) &&
-        Boolean(document.getElementById("haReplayOnStopEnabled")?.checked));
-    setDependentState("debugLogs", "debug-details");
     setDependentState("discogsEnabled", "discogs-details");
     setDependentState("vinylAutoWakeEnabled", "vinyl-auto-wake-details");
     setDependentState("vinylAudioSleepEnabled", "vinyl-audio-sleep-details");
@@ -767,7 +763,9 @@ document.addEventListener("DOMContentLoaded", () => {
             event.stopPropagation();
             if (!confirm(`Delete "${image.filename}"?`)) return;
 
-            const response = await fetch(`/api/fallback-image/${encodeURIComponent(image.filename)}`, {
+            const fileRef = (image.delete_ref || image.filename)
+              .split("/").map(encodeURIComponent).join("/");
+            const response = await fetch(`/api/fallback-image/${fileRef}`, {
               method: "DELETE",
             });
             const result = await response.json().catch(() => ({}));
@@ -1007,7 +1005,6 @@ document.addEventListener("DOMContentLoaded", () => {
     "sideFlipEnabled",
     "discoveryEnabled",
     "useHA",
-    "haReplayOnStopEnabled",
     "debugLogs",
     "discogsEnabled",
     "vinylAutoWakeEnabled",
@@ -1192,12 +1189,12 @@ async function loadConfig() {
     // DEBUG
     document.getElementById("debugLogs").checked =
         !!debug.logs;
-    document.getElementById("debugPixooFramePath").value =
-        debug.pixoo_frame_path || "";
-    document.getElementById("debugPreviewPath").value =
-        debug.preview_path || "";
-    document.getElementById("debugWavPath").value =
-        debug.wav_path || "";
+    document.getElementById("debugPixooFrameEnabled").checked =
+        !!debug.pixoo_frame_path;
+    document.getElementById("debugPreviewEnabled").checked =
+        !!debug.preview_path;
+    document.getElementById("debugWavEnabled").checked =
+        !!debug.wav_path;
 
     // HOME ASSISTANT
     document.getElementById("useHA").checked =
@@ -1206,8 +1203,6 @@ async function loadConfig() {
         homeassistant.base_url || "";
     document.getElementById("webHookID").value =
         homeassistant.webhook_id || "";
-    document.getElementById("haReplayOnStopEnabled").checked =
-        !!homeassistant.replay_on_stop_enabled;
     document.getElementById("haStopWebhookID").value =
         homeassistant.stop_webhook_id || "";
 
@@ -1415,12 +1410,13 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     // DEBUG
     debug.logs =
         document.getElementById("debugLogs").checked;
-    debug.pixoo_frame_path =
-        document.getElementById("debugPixooFramePath").value;
-    debug.preview_path =
-        document.getElementById("debugPreviewPath").value;
-    debug.wav_path =
-        document.getElementById("debugWavPath").value;
+    // Fixed destinations inside the persistent data directory.
+    debug.pixoo_frame_path = document.getElementById("debugPixooFrameEnabled").checked
+        ? "data/debug/pixoo_frame.png" : "";
+    debug.preview_path = document.getElementById("debugPreviewEnabled").checked
+        ? "data/debug/preview.png" : "";
+    debug.wav_path = document.getElementById("debugWavEnabled").checked
+        ? "data/debug/recording.wav" : "";
 
     // HOME ASSISTANT
     homeassistant.use_ha =
@@ -1429,8 +1425,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("baseURL").value;
     homeassistant.webhook_id =
         document.getElementById("webHookID").value;
-    homeassistant.replay_on_stop_enabled =
-        document.getElementById("haReplayOnStopEnabled").checked;
+    // Retired the separate stop-toggle: the HA master switch now controls both hooks.
+    delete homeassistant.replay_on_stop_enabled;
     homeassistant.stop_webhook_id =
         document.getElementById("haStopWebhookID").value.trim();
 
