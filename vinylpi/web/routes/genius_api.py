@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import sqlite3
 import threading
 import unicodedata
@@ -25,10 +26,14 @@ def _connection():
     path = _cache_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path, timeout=5)
-    connection.execute("""CREATE TABLE IF NOT EXISTS lyrics_cache (
-        artist TEXT NOT NULL, title TEXT NOT NULL, payload TEXT NOT NULL,
-        cached_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (artist, title))""")
+    try:
+        connection.execute("""CREATE TABLE IF NOT EXISTS lyrics_cache (
+            artist TEXT NOT NULL, title TEXT NOT NULL, payload TEXT NOT NULL,
+            cached_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (artist, title))""")
+    except BaseException:
+        connection.close()
+        raise
     return connection
 
 
@@ -41,20 +46,20 @@ def api_lyrics():
 
     key = (_cache_key(artist), _cache_key(title))
     try:
-        with _cache_lock, _connection() as db:
+        with _cache_lock, closing(_connection()) as db:
             row = db.execute("SELECT payload FROM lyrics_cache WHERE artist=? AND title=?", key).fetchone()
         if row:
-            result = json.loads(row[0])
-            return jsonify({**result, "cached": True})
+            # Keep the original API payload independent of the cache implementation.
+            return jsonify(json.loads(row[0]))
     except (sqlite3.Error, OSError, ValueError) as exc:
         current_app.logger.warning("Lyrics cache read failed: %s", exc)
 
     result = get_lyrics(artist, title)
     if result.get("ok") and result.get("lyrics"):
         try:
-            with _cache_lock, _connection() as db:
+            with _cache_lock, closing(_connection()) as db, db:
                 db.execute("INSERT OR REPLACE INTO lyrics_cache (artist,title,payload) VALUES (?,?,?)",
                            (*key, json.dumps(result, ensure_ascii=False)))
         except (sqlite3.Error, OSError) as exc:
             current_app.logger.warning("Lyrics cache write failed: %s", exc)
-    return jsonify({**result, "cached": False})
+    return jsonify(result)
