@@ -163,13 +163,9 @@ class PixooClient:
                 f"Pixoo only supports 16, 32 or 64 pixel width/height, received: {width}"
             )
 
-        buf = bytearray()
-        for y in range(height):
-            for x in range(width):
-                r, g, b = img.getpixel((x, y))
-                buf.extend((r, g, b))
-
-        return bytes(buf)
+        # PIL's native encoder preserves the exact row-major RGB bytes while
+        # avoiding 4,096 Python-level getpixel calls per 64x64 Pixoo frame.
+        return img.tobytes()
 
     def send_frame(self, frame: Image.Image, *, speed_ms: Optional[int] = None) -> None:
         width, height = frame.size

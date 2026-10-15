@@ -403,58 +403,6 @@ function updateAlbumCarousel() {
     });
 }
 
-function renderStats(data) {
-    const minutes = Number(data.total_minutes_listened) || 0;
-    document.getElementById("stats-minutes").textContent = Math.round(minutes).toLocaleString();
-    const pickupUsage = document.getElementById("stats-pickup-usage");
-    if (pickupUsage) pickupUsage.textContent = formatPickupDuration(data.pickup_usage_seconds);
-
-    const songs = Array.isArray(data.top_songs) ? data.top_songs : [];
-    const artists = Array.isArray(data.top_artists) ? data.top_artists : [];
-    const albums = Array.isArray(data.top_albums) ? data.top_albums : [];
-
-    setupExpandableList(
-        document.getElementById("stats-songs"),
-        songs,
-        (song, index) => createRankedItem(
-            index + 1,
-            song.title,
-            song.artist,
-            formatCount(song.count, "play"),
-            song.genre || "",
-        ),
-        "No songs recognized yet.",
-    );
-
-    setupExpandableList(
-        document.getElementById("stats-artists"),
-        artists,
-        (artist, index) => createRankedItem(index + 1, artist.name, "", formatCount(artist.count, "play")),
-        "No artists recognized yet.",
-    );
-
-    setupExpandableList(
-        document.getElementById("stats-albums"),
-        albums,
-        (album, index) => createRankedItem(index + 1, album.name, "", formatCount(album.count, "session")),
-        "No album sessions recorded yet.",
-    );
-
-    renderGenreChart(data.radar_genres || data.top_genres || []);
-    renderAlbumCarousel(data.top_album_covers || []);
-}
-
-async function loadStats() {
-    try {
-        const response = await fetch("/api/stats", { cache: "no-store" });
-        if (!response.ok) throw new Error(`Statistics request failed: ${response.status}`);
-        renderStats(await response.json());
-    } catch (error) {
-        console.error(error);
-        renderStats({});
-    }
-}
-
 document.addEventListener("DOMContentLoaded", () => {
     loadStats();
 

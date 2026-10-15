@@ -7,11 +7,10 @@ from dotenv import load_dotenv
 from vinylpi.core.display import show_fallback_image, start_scrolling_display
 from vinylpi.core.display_refresh import start_display_refresh_watcher
 from vinylpi.core.image_utils import dynamic_bg_color, load_image
+from vinylpi.core.spotify_genre_backfill import request_spotify_genre_backfill
 from vinylpi.core.spotify_stats import (
     add_spotify_listening_seconds,
-    get_spotify_songs_missing_genre,
     record_spotify_play,
-    update_spotify_genre,
 )
 from vinylpi.core.status import get_last_source_status, write_status
 from vinylpi.integrations.home_assistant import send_rgb, send_recognition_stopped
@@ -67,15 +66,8 @@ def _display_track(track) -> None:
 
 
 def _backfill_missing_genres(client: SpotifyClient, *, limit: int = 30) -> None:
-    """Fill older Spotify rows that were recorded while Spotify returned no genre."""
-    for row in get_spotify_songs_missing_genre(limit=limit):
-        genre = client.get_artist_genre(
-            row.get("artist_id"),
-            artist=str(row.get("artist") or ""),
-            title=str(row.get("title") or ""),
-        )
-        if genre:
-            update_spotify_genre(str(row.get("track_id") or ""), genre)
+    """Schedule metadata recovery without delaying the first Spotify poll."""
+    request_spotify_genre_backfill(db_path=client.profile_db_path, limit=limit)
 
 
 def _poll_seconds() -> float:

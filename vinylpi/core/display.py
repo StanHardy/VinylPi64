@@ -216,12 +216,28 @@ def _scroll_loop(
     first_frame_saved = False
     tick_float = 0.0
     last_time = time.monotonic()
+    last_sent_tick: int | None = None
+    has_scrolling_text = any(
+        int(line["width"]) > canvas_size for line in resources["lines"]
+    )
 
     while not _scroll_stop_event.is_set():
         now = time.monotonic()
         tick_float += speed_px_per_s * (now - last_time)
         last_time = now
         tick = int(tick_float)
+
+        if last_sent_tick is not None:
+            if not has_scrolling_text:
+                # Static covers and short titles only need a single frame.
+                _scroll_stop_event.wait()
+                break
+            if tick == last_sent_tick:
+                # Drawing/sending again would be pixel-identical, just waste
+                # CPU, Wi-Fi and Pixoo HTTP round trips.
+                if _scroll_stop_event.wait(sleep_seconds):
+                    break
+                continue
 
         frame = _render_scroll_frame(resources, tick)
 
@@ -245,6 +261,7 @@ def _scroll_loop(
 
         try:
             pixoo.send_frame(frame)
+            last_sent_tick = tick
         except PixooError as exc:
             print(f"Pixoo not available or API-error: {exc}")
             _reset_pixoo_client()

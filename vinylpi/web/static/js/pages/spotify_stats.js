@@ -3,6 +3,9 @@
 let vinylPiStatsScope = "vinyl";
 let vinylPiStatsRequestId = 0;
 let vinylPiStatsController = null;
+// Keep already rendered scopes in memory while this page is open. Values are
+// always revalidated, but switching tabs no longer flashes an empty overview.
+const vinylPiStatsCache = new Map();
 
 function statsScopeCopy(scope) {
     return {
@@ -41,7 +44,7 @@ function updateStatsScopeUI() {
     if (pickupUsageRow) pickupUsageRow.classList.toggle("hidden", vinylPiStatsScope !== "vinyl");
 }
 
-renderStats = function renderScopedStats(data = {}) {
+function renderStats(data = {}) {
     const minutes = Number(data.total_minutes_listened) || 0;
     const minutesElement = document.getElementById("stats-minutes");
     if (minutesElement) minutesElement.textContent = Math.round(minutes).toLocaleString();
@@ -108,7 +111,7 @@ renderStats = function renderScopedStats(data = {}) {
     renderAlbumCarousel(data.top_album_covers || []);
 };
 
-loadStats = async function loadScopedStats() {
+async function loadStats() {
     const scope = vinylPiStatsScope;
     const requestId = ++vinylPiStatsRequestId;
     vinylPiStatsController?.abort();
@@ -116,7 +119,8 @@ loadStats = async function loadScopedStats() {
     vinylPiStatsController = controller;
     // Never display another tab's statistics under the newly selected tab.
     updateStatsScopeUI();
-    renderStats({});
+    const cached = vinylPiStatsCache.get(scope);
+    renderStats(cached || {});
     try {
         const response = await fetch(`/api/stats?scope=${encodeURIComponent(scope)}`, {
             cache: "no-store", signal: controller.signal,
@@ -124,11 +128,16 @@ loadStats = async function loadScopedStats() {
         if (!response.ok) throw new Error(`Statistics request failed: ${response.status}`);
         const data = await response.json();
         if (requestId !== vinylPiStatsRequestId || scope !== vinylPiStatsScope) return;
-        renderStats(data);
+        vinylPiStatsCache.set(scope, data);
+        // Chart.js and the album carousel are expensive on a Pi Zero. Avoid
+        // rebuilding them when a background revalidation changed nothing.
+        if (!cached || JSON.stringify(cached) !== JSON.stringify(data)) {
+            renderStats(data);
+        }
     } catch (error) {
         if (error.name === "AbortError" || requestId !== vinylPiStatsRequestId) return;
         console.error(error);
-        renderStats({});
+        if (!cached) renderStats({});
     } finally {
         if (vinylPiStatsController === controller) vinylPiStatsController = null;
     }

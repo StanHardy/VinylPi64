@@ -129,5 +129,41 @@ class LayoutConstraintTests(unittest.TestCase):
         self.assertLessEqual(last["y"] + resources["glyph_height"], 64)
 
 
+class PixooUnchangedFrameTests(unittest.TestCase):
+    def test_static_track_sends_only_one_frame_until_stopped(self):
+        import threading
+        import time
+        from unittest.mock import Mock, patch
+        from vinylpi.core import display
+
+        stopped = threading.Event()
+        pixoo = Mock()
+        pixoo.send_frame = Mock()
+        resources = {'canvas_size': 64, 'lines': [{'width': 20}]}
+        config = {'debug': {'logs': False, 'pixoo_frame_path': '', 'preview_path': ''},
+                  'image': {'marquee_speed': 20, 'sleep_seconds': 0.01}}
+        with patch.object(display, '_scroll_stop_event', stopped), \
+             patch.object(display, 'read_config', return_value=config), \
+             patch.object(display, '_get_pixoo', return_value=pixoo), \
+             patch.object(display, '_prepare_scroll_resources', return_value=resources), \
+             patch.object(display, '_render_scroll_frame', return_value=Image.new('RGB', (64, 64))):
+            thread = threading.Thread(
+                target=display._scroll_loop,
+                args=(Image.new('RGB', (64, 64)), 'Artist', 'Title'), daemon=True,
+            )
+            try:
+                thread.start()
+                deadline = time.monotonic() + 1
+                while not pixoo.send_frame.called and time.monotonic() < deadline:
+                    time.sleep(0.005)
+                self.assertTrue(pixoo.send_frame.called)
+                time.sleep(0.1)
+                self.assertEqual(pixoo.send_frame.call_count, 1)
+            finally:
+                stopped.set()
+                thread.join(timeout=2)
+            self.assertFalse(thread.is_alive())
+
+
 if __name__ == "__main__":
     unittest.main()

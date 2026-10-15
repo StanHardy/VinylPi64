@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from vinylpi.core.spotify_stats import get_spotify_ranked_stats
+from vinylpi.core.spotify_genre_backfill import request_spotify_genre_backfill
 from vinylpi.web.services.stats import get_top_stats as get_vinyl_top_stats
 
 
@@ -50,12 +51,15 @@ def _merge_named(left: list[dict], right: list[dict], *, limit: int) -> list[dic
 def get_scoped_stats(scope: str = "vinyl", *, limit: int = 10) -> dict[str, Any]:
     scope = str(scope or "vinyl").strip().lower()
     if scope == "spotify":
-        return get_spotify_ranked_stats(limit=limit)
+        stats = get_spotify_ranked_stats(limit=limit)
+        request_spotify_genre_backfill()
+        return stats
     if scope != "combined":
         return _vinyl_stats(limit)
 
     vinyl = _vinyl_stats(limit=max(limit, 25))
     spotify = get_spotify_ranked_stats(limit=max(limit, 25))
+    request_spotify_genre_backfill()
 
     genres = _merge_named(vinyl.get("top_genres") or [], spotify.get("top_genres") or [], limit=limit)
     albums = _merge_named(vinyl.get("top_albums") or [], spotify.get("top_albums") or [], limit=limit)

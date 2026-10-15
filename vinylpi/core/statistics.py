@@ -7,18 +7,12 @@ import requests
 from vinylpi.core.stats_db import (
     add_listening_seconds,
     get_duration_cache,
-    get_stats_snapshot,
     increment_album_session,
     update_song_duration,
     update_song_stats,
     upsert_duration_cache,
 )
 from vinylpi.paths import MB_UA, MB_URL
-
-
-def _load_stats() -> dict:
-    """Compatibility helper returning the former stats.json structure."""
-    return get_stats_snapshot()
 
 
 def _update_stats(

@@ -1,14 +1,34 @@
 from __future__ import annotations
 
 import time
+import threading
+from pathlib import Path
 from typing import Any
 
 from vinylpi.core.database import get_connection, init_db
+from vinylpi.paths import get_active_db_path
 
 
-def init_spotify_stats() -> None:
-    init_db()
-    with get_connection() as conn:
+_SPOTIFY_INIT_LOCK = threading.Lock()
+_SPOTIFY_INITIALIZED_PATHS: set[str] = set()
+
+
+def init_spotify_stats(db_path: Path | str | None = None) -> None:
+    """Initialize Spotify tables once per profile/process (not on every poll)."""
+    path = Path(db_path) if db_path is not None else get_active_db_path()
+    init_db(path)
+    key = str(path.resolve())
+    if key in _SPOTIFY_INITIALIZED_PATHS:
+        return
+    with _SPOTIFY_INIT_LOCK:
+        if key in _SPOTIFY_INITIALIZED_PATHS:
+            return
+        _create_spotify_schema(path)
+        _SPOTIFY_INITIALIZED_PATHS.add(key)
+
+
+def _create_spotify_schema(path: Path) -> None:
+    with get_connection(path) as conn:
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS spotify_songs (
@@ -48,6 +68,11 @@ def init_spotify_stats() -> None:
 
             INSERT OR IGNORE INTO spotify_listening_totals (id, total_seconds)
             VALUES (1, 0);
+
+            CREATE TABLE IF NOT EXISTS spotify_genre_attempts (
+                track_id TEXT PRIMARY KEY,
+                last_attempt_at INTEGER NOT NULL
+            );
 
             CREATE INDEX IF NOT EXISTS idx_spotify_songs_play_count
                 ON spotify_songs(play_count DESC);
@@ -187,28 +212,72 @@ def get_last_spotify_status_from_stats() -> dict[str, Any] | None:
     }
 
 
-def get_spotify_songs_missing_genre(limit: int = 50) -> list[dict[str, Any]]:
-    init_spotify_stats()
-    with get_connection() as conn:
+def get_spotify_songs_missing_genre(
+    limit: int = 50,
+    *,
+    db_path: Path | str | None = None,
+    retry_after_seconds: int = 0,
+) -> list[dict[str, Any]]:
+    """Return missing rows, optionally skipping recently attempted lookups."""
+    init_spotify_stats(db_path)
+    with get_connection(db_path) as conn:
         rows = conn.execute(
             """
-            SELECT track_id, artist, title, artist_id
-            FROM spotify_songs
-            WHERE genre IS NULL OR TRIM(genre) = ''
-            ORDER BY updated_at DESC
+            SELECT s.track_id, s.artist, s.title, s.artist_id
+            FROM spotify_songs AS s
+            LEFT JOIN spotify_genre_attempts AS a ON a.track_id = s.track_id
+            WHERE (s.genre IS NULL OR TRIM(s.genre) = '')
+              AND (a.last_attempt_at IS NULL OR a.last_attempt_at <= ?)
+            ORDER BY s.updated_at DESC
             LIMIT ?
             """,
-            (max(1, int(limit)),),
+            (int(time.time()) - max(0, int(retry_after_seconds)), max(1, int(limit))),
         ).fetchall()
     return [{key: row[key] for key in row.keys()} for row in rows]
 
 
-def update_spotify_genre(track_id: str, genre: str | None) -> None:
+def claim_spotify_songs_missing_genre(
+    *, limit: int = 8, db_path: Path | str | None = None,
+    retry_after_seconds: int = 24 * 60 * 60,
+) -> list[dict[str, Any]]:
+    """Atomically claim missing genres across the web and Spotify processes.
+
+    Claiming before the HTTP requests prevents two workers from fetching the
+    same artist at the same time. Failed lookups become eligible again later.
+    """
+    init_spotify_stats(db_path)
+    now = int(time.time())
+    with get_connection(db_path) as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        rows = conn.execute(
+            """
+            SELECT s.track_id, s.artist, s.title, s.artist_id
+            FROM spotify_songs AS s
+            LEFT JOIN spotify_genre_attempts AS a ON a.track_id = s.track_id
+            WHERE (s.genre IS NULL OR TRIM(s.genre) = '')
+              AND (a.last_attempt_at IS NULL OR a.last_attempt_at <= ?)
+            ORDER BY s.updated_at DESC
+            LIMIT ?
+            """,
+            (now - max(0, int(retry_after_seconds)), max(1, int(limit))),
+        ).fetchall()
+        conn.executemany(
+            """INSERT INTO spotify_genre_attempts (track_id, last_attempt_at)
+               VALUES (?, ?)
+               ON CONFLICT(track_id) DO UPDATE SET last_attempt_at = excluded.last_attempt_at""",
+            [(row["track_id"], now) for row in rows],
+        )
+    return [{key: row[key] for key in row.keys()} for row in rows]
+
+
+def update_spotify_genre(
+    track_id: str, genre: str | None, *, db_path: Path | str | None = None,
+) -> None:
     clean = str(genre or "").strip()
     if not track_id or not clean:
         return
-    init_spotify_stats()
-    with get_connection() as conn:
+    init_spotify_stats(db_path)
+    with get_connection(db_path) as conn:
         conn.execute(
             """
             UPDATE spotify_songs
@@ -218,29 +287,24 @@ def update_spotify_genre(track_id: str, genre: str | None) -> None:
             (clean, track_id),
         )
 
-def _backfill_missing_genres_for_stats(limit: int = 8) -> None:
-    # Spotify's artist genre field is deprecated and can be empty. Resolve any
-    # missing rows through the same Spotify -> Last.fm fallback used by the
-    # worker, then persist the result so this is normally a one-time lookup.
-    try:
-        from vinylpi.integrations.spotify_client import SpotifyClient
-
-        client = SpotifyClient()
-        for row in get_spotify_songs_missing_genre(limit=limit):
-            genre = client.get_artist_genre(
-                row.get("artist_id"),
-                artist=str(row.get("artist") or ""),
-                title=str(row.get("title") or ""),
-            )
-            if genre:
-                update_spotify_genre(str(row.get("track_id") or ""), genre)
-    except Exception:
-        pass
+def mark_spotify_genre_attempt(
+    track_id: str, *, db_path: Path | str | None = None, attempted_at: int | None = None,
+) -> None:
+    """Persist a backfill attempt so failed lookups do not repeat on every visit."""
+    if not track_id:
+        return
+    init_spotify_stats(db_path)
+    with get_connection(db_path) as conn:
+        conn.execute(
+            """INSERT INTO spotify_genre_attempts (track_id, last_attempt_at)
+               VALUES (?, ?)
+               ON CONFLICT(track_id) DO UPDATE SET last_attempt_at = excluded.last_attempt_at""",
+            (track_id, int(time.time()) if attempted_at is None else int(attempted_at)),
+        )
 
 
 def get_spotify_ranked_stats(limit: int = 10) -> dict[str, Any]:
     init_spotify_stats()
-    _backfill_missing_genres_for_stats()
     limit = max(1, int(limit))
     with get_connection() as conn:
         songs = [
