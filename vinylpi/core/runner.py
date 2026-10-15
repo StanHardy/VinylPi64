@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+import os
 
 from vinylpi.config.config_watcher import maybe_log_config_reload
 from vinylpi.core.audio_capture import record_sample
@@ -92,12 +93,20 @@ def main_loop() -> None:
     discogs_state = DiscogsPlaybackState()
     start_display_refresh_watcher(debug_log=cfg.debug_log)
     stop_reason = None
+    # Worker-local immutable start origin; a manual session cannot be put to sleep
+    # by either the audio-level tracker or unsuccessful Shazam recognitions.
+    manually_started = os.environ.get("VINYLPI_START_ORIGIN", "auto_wake") != "auto_wake"
 
     while True:
         try:
             cfg_reloaded = maybe_log_config_reload()
             raw_cfg = read_config()
             cfg = LoopConfig.from_config(raw_cfg)
+            manual_sleep_protected = manually_started and bool(
+                (raw_cfg.get("behavior") or {}).get("vinyl_manual_shutdown_only", True)
+            )
+            if manual_sleep_protected:
+                cfg.auto_sleep_enabled = False
             pickup_tracker.configure(PickupUsageConfig.from_config(raw_cfg))
             audio_sleep_tracker.configure(VinylAudioSleepConfig.from_config(raw_cfg))
 
@@ -128,7 +137,7 @@ def main_loop() -> None:
                     log_level=True,
                 )
 
-            if level is not None and audio_sleep_tracker.config.enabled:
+            if level is not None and audio_sleep_tracker.config.enabled and not manual_sleep_protected:
                 if cfg.debug_log and not pickup_tracker.config.enabled:
                     print(f"Vinyl input level: {level.dbfs:.1f} dBFS")
                 if audio_sleep_tracker.observe(level.dbfs, level.duration_seconds):

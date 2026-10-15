@@ -97,6 +97,7 @@ CONFIG_DEFAULTS = {
         "vinyl_auto_wake_threshold_dbfs": -48.0,
         "vinyl_auto_wake_confirm_seconds": 2.0,
         "vinyl_auto_sleep_enabled": True,
+        "vinyl_manual_shutdown_only": True,
         "vinyl_auto_sleep_iterations": 30,
         "vinyl_audio_sleep_enabled": True,
         "vinyl_audio_sleep_threshold_dbfs": -61.0,

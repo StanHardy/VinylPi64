@@ -1179,6 +1179,8 @@ async function loadConfig() {
         behavior.vinyl_audio_sleep_threshold_dbfs ?? pickupUsage.stop_threshold_dbfs ?? -61;
     document.getElementById("vinylAudioSleepConfirmSeconds").value =
         behavior.vinyl_audio_sleep_confirm_seconds ?? pickupUsage.stop_confirm_seconds ?? 30;
+    document.getElementById("vinylManualShutdownOnly").checked =
+        behavior.vinyl_manual_shutdown_only !== false;
     document.getElementById("vinylAutoSleepEnabled").checked =
         behavior.vinyl_auto_sleep_enabled !== false;
     document.getElementById("vinylAutoSleepIterations").value =
@@ -1395,6 +1397,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         600,
         Math.max(0.1, parseFloat(document.getElementById("vinylAudioSleepConfirmSeconds").value) || 30),
     );
+    behavior.vinyl_manual_shutdown_only =
+        document.getElementById("vinylManualShutdownOnly").checked;
     behavior.vinyl_auto_sleep_enabled =
         document.getElementById("vinylAutoSleepEnabled").checked;
     behavior.vinyl_auto_sleep_iterations = Math.max(

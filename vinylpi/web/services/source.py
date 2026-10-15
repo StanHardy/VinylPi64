@@ -218,7 +218,7 @@ def set_mode(mode: str, *, _from_auto_wake: bool = False) -> dict:
             try:
                 spotify.stop()
                 show_fallback_image()
-                recognizer.start(silence_output=_debug_silence())
+                recognizer.start(silence_output=_debug_silence(), start_origin="auto_wake" if _from_auto_wake else "manual")
                 _source_mode = "vinyl"
                 return get_status()
             finally:

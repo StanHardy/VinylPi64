@@ -1,6 +1,8 @@
 /* Vinyl / Spotify / Combined statistics selector. Loaded after stats.js. */
 
 let vinylPiStatsScope = "vinyl";
+let vinylPiStatsRequestId = 0;
+let vinylPiStatsController = null;
 
 function statsScopeCopy(scope) {
     return {
@@ -107,16 +109,28 @@ renderStats = function renderScopedStats(data = {}) {
 };
 
 loadStats = async function loadScopedStats() {
+    const scope = vinylPiStatsScope;
+    const requestId = ++vinylPiStatsRequestId;
+    vinylPiStatsController?.abort();
+    const controller = new AbortController();
+    vinylPiStatsController = controller;
+    // Never display another tab's statistics under the newly selected tab.
     updateStatsScopeUI();
+    renderStats({});
     try {
-        const response = await fetch(`/api/stats?scope=${encodeURIComponent(vinylPiStatsScope)}`, {
-            cache: "no-store",
+        const response = await fetch(`/api/stats?scope=${encodeURIComponent(scope)}`, {
+            cache: "no-store", signal: controller.signal,
         });
         if (!response.ok) throw new Error(`Statistics request failed: ${response.status}`);
-        renderStats(await response.json());
+        const data = await response.json();
+        if (requestId !== vinylPiStatsRequestId || scope !== vinylPiStatsScope) return;
+        renderStats(data);
     } catch (error) {
+        if (error.name === "AbortError" || requestId !== vinylPiStatsRequestId) return;
         console.error(error);
         renderStats({});
+    } finally {
+        if (vinylPiStatsController === controller) vinylPiStatsController = null;
     }
 };
 

@@ -3,6 +3,9 @@
 let vinylPiSourceMode = "off";
 let vinylPiSourcePollTimer = null;
 let vinylPiSourceBusyForViewer = false;
+let vinylPiSourceRequestId = 0;
+let vinylPiSourceChanging = false;
+let vinylPiLastSourceData = null;
 
 const vinylPiOriginalRenderDiscogsContext = renderDiscogsContext;
 const vinylPiOriginalShowTrackInfo = showTrackInfo;
@@ -97,6 +100,7 @@ function renderSpotifyConnection(spotify = {}) {
 }
 
 function updateSourceUI(data = {}) {
+    vinylPiLastSourceData = data;
     vinylPiSourceMode = ["off", "vinyl", "spotify"].includes(data.mode) ? data.mode : "off";
     vinylPiSourceBusyForViewer = Boolean(data.busy_for_viewer);
     document.dispatchEvent(new CustomEvent("vinylpi:source-change", { detail: { mode: vinylPiSourceMode } }));
@@ -138,10 +142,12 @@ function updateSourceUI(data = {}) {
 }
 
 async function loadSourceStatus() {
+    const requestId = ++vinylPiSourceRequestId;
     try {
         const response = await fetch("/api/source", { cache: "no-store" });
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.error || `Source request failed: ${response.status}`);
+        if (requestId !== vinylPiSourceRequestId || vinylPiSourceChanging) return;
         updateSourceUI(data);
     } catch (error) {
         console.error(error);
@@ -149,6 +155,8 @@ async function loadSourceStatus() {
 }
 
 async function setSourceMode(mode) {
+    vinylPiSourceChanging = true;
+    ++vinylPiSourceRequestId;
     document.querySelectorAll("[data-source-mode]").forEach((button) => {
         button.disabled = true;
     });
@@ -179,6 +187,7 @@ async function setSourceMode(mode) {
         console.error(error);
         setSpotifyFeedback("Could not change the music source.", "error");
     } finally {
+        vinylPiSourceChanging = false;
         document.querySelectorAll("[data-source-mode]").forEach((button) => {
             button.disabled = vinylPiSourceBusyForViewer;
         });
@@ -252,4 +261,20 @@ document.addEventListener("visibilitychange", () => {
     }
     loadSourceStatus();
     startSourcePolling();
+});
+
+// The track card and selector must commit the same source from the same
+// /api/status event, rather than diverge until the next /api/source poll.
+document.addEventListener("vinylpi:visible-status", (event) => {
+    if (vinylPiSourceChanging) return;
+    const mode = event.detail?.mode;
+    if (!["off", "vinyl", "spotify"].includes(mode) || mode === vinylPiSourceMode) return;
+    vinylPiSourceMode = mode;
+    document.querySelectorAll("[data-source-mode]").forEach((button) => {
+        const active = button.dataset.sourceMode === mode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+    });
+    // Refresh additional ownership/connection data without delaying the selector.
+    loadSourceStatus();
 });

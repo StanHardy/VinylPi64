@@ -469,6 +469,9 @@ function renderEmptyStatus(message = "No recognized song yet") {
 }
 
 function renderStatus(status) {
+    document.dispatchEvent(new CustomEvent("vinylpi:visible-status", {
+        detail: { mode: status.source || "off" },
+    }));
     const nextTrackKey = getTrackKey({
         artist: status.artist,
         title: status.title,

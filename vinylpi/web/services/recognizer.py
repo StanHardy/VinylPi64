@@ -1,6 +1,7 @@
 import subprocess
 import threading
 import sys
+import os
 from typing import Optional
 from vinylpi.paths import BASE_DIR
 
@@ -16,23 +17,26 @@ def is_running() -> bool:
     _recognizer_proc = None
     return False
 
-def start(*, silence_output: bool) -> bool:
+def start(*, silence_output: bool, start_origin: str = "manual") -> bool:
     global _recognizer_proc
     with _lock:
         if is_running():
             return False
 
         cmd = [sys.executable, "-u", "-m", "vinylpi.main"]
+        env = os.environ.copy()
+        env["VINYLPI_START_ORIGIN"] = "auto_wake" if start_origin == "auto_wake" else "manual"
 
         if silence_output:
             _recognizer_proc = subprocess.Popen(
                 cmd,
                 cwd=BASE_DIR,
+                env=env,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
         else:
-            _recognizer_proc = subprocess.Popen(cmd, cwd=BASE_DIR)
+            _recognizer_proc = subprocess.Popen(cmd, cwd=BASE_DIR, env=env)
 
         return True
 
