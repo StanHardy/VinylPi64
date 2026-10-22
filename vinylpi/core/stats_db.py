@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from vinylpi.core.database import get_connection, init_db
+from vinylpi.core.annual_stats import log_play, log_album, log_seconds, refresh_vinyl_baseline
 
 
 def make_song_key(artist: str, title: str) -> str:
@@ -93,6 +94,7 @@ def update_song_stats(
             """,
             (artist, now),
         )
+        log_play(conn, 'vinyl', song_key, artist, title, album, occurred_at=now)
 
 
 def increment_album_session(album: str | None) -> None:
@@ -110,6 +112,7 @@ def increment_album_session(album: str | None) -> None:
             """,
             (album,),
         )
+        log_album(conn, 'vinyl', album)
 
 
 def get_duration_cache(artist: str, title: str) -> dict | None:
@@ -190,6 +193,7 @@ def add_listening_seconds(seconds: float) -> float:
             """,
             (seconds,),
         )
+        log_seconds(conn, 'vinyl', 'listening', seconds)
         row = conn.execute(
             "SELECT total_seconds FROM listening_totals WHERE id = 1"
         ).fetchone()
@@ -208,6 +212,7 @@ def add_pickup_usage_seconds(seconds: float) -> float:
             """,
             (seconds,),
         )
+        log_seconds(conn, 'vinyl', 'pickup', seconds)
         row = conn.execute(
             "SELECT total_seconds FROM pickup_usage_totals WHERE id = 1"
         ).fetchone()
@@ -1060,6 +1065,7 @@ def import_stats_json(
             "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (digest,),
         )
+        refresh_vinyl_baseline(conn)
 
     return {
         "songs": len(songs),
@@ -1088,6 +1094,8 @@ def replace_listening_total(
 ) -> None:
     init_db()
     with get_connection() as conn:
+        old_row = conn.execute("SELECT total_seconds FROM listening_totals WHERE id=1").fetchone()
+        delta = float(total_seconds) - float(old_row['total_seconds'] if old_row else 0)
         conn.execute(
             """
             UPDATE listening_totals SET
@@ -1103,6 +1111,7 @@ def replace_listening_total(
                 1 if recalculated_from_song_counts else 0,
             ),
         )
+        log_seconds(conn, 'vinyl', 'listening', delta)
 
 
 def get_meta(key: str) -> str | None:

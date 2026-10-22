@@ -43,17 +43,19 @@ def get_top_stats(limit: int = 10) -> dict:
         return _empty_stats_payload()
 
 
-def get_share_card_payload(limit: int = 5, *, scope: str = "vinyl") -> dict[str, Any]:
+def get_share_card_payload(limit: int = 5, *, scope: str = "vinyl", year: int | None = None) -> dict[str, Any]:
     # Resolve all three sources through the same aggregation used on /stats.html.
     # Import here to avoid the stats_scoped -> stats circular import at module load.
     from vinylpi.web.services.stats_scoped import get_scoped_stats
 
     scope = scope if scope in {"vinyl", "spotify", "combined"} else "vinyl"
-    stats = get_scoped_stats(scope=scope, limit=max(10, int(limit)))
+    stats = (get_scoped_stats(scope=scope, limit=max(10, int(limit)), year=year)
+             if year is not None else get_scoped_stats(scope=scope, limit=max(10, int(limit))))
     profile = get_active_profile() or {}
     genres = list(stats.get("top_genres") or [])[:5]
     return {
         "scope": scope,
+        "year": year,
         "profile_name": profile.get("name") or "Guest",
         "total_minutes_listened": int(stats.get("total_minutes_listened") or 0),
         "pickup_usage_seconds": float(stats.get("pickup_usage_seconds") or 0.0) if scope == "vinyl" else None,
@@ -65,8 +67,8 @@ def get_share_card_payload(limit: int = 5, *, scope: str = "vinyl") -> dict[str,
     }
 
 
-def build_share_card_image(payload: dict[str, Any] | None = None, *, scope: str = "vinyl") -> bytes:
-    data = payload if payload is not None else get_share_card_payload(limit=5, scope=scope)
+def build_share_card_image(payload: dict[str, Any] | None = None, *, scope: str = "vinyl", year: int | None = None) -> bytes:
+    data = payload if payload is not None else get_share_card_payload(limit=5, scope=scope, year=year)
     image = _create_share_card(data)
     output = io.BytesIO()
     image.save(output, format="PNG", optimize=True)
@@ -321,12 +323,13 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
     image = _draw_background((width, height), accent)
     draw = ImageDraw.Draw(image)
 
-    draw.text((72, 69), "VINYLPI  /  LISTENING LOG", font=_font(22, pixel=True), fill=accent)
-    _draw_right(draw, 1008, 70, "01 / STATS", _font(17, pixel=True), _MUTED)
+    draw.text((72, 69), "VINYLPI64", font=_font(22, pixel=True), fill=accent)
+    _draw_right(draw, 1008, 70, "LISTENING STATS", _font(17, pixel=True), _MUTED)
     draw.line((72, 119, 1008, 119), fill=_LINE, width=2)
 
-    draw.text((72, 153), "On the Record.", font=_font(76, bold=True), fill=_WHITE)
-    draw.text((76, 265), "A little history of what you listened to.", font=_font(26), fill=_MUTED)
+    draw.text((72, 153), "Spin Report", font=_font(76, bold=True), fill=_WHITE)
+    # Single title: avoid multiple stacked marketing subtitles.
+    draw.text((76, 265), str(payload.get("year") or "ALL TIME"), font=_font(26, pixel=True), fill=_MUTED)
 
     pill = scope.upper()
     label_font = _font(23, bold=True)
@@ -367,5 +370,5 @@ def _create_share_card(payload: dict[str, Any]) -> Image.Image:
 
     draw.line((72, 1880, 1008, 1880), fill=_LINE, width=2)
     draw.text((74, 1890), "VINYLPI64", font=_font(17, pixel=True), fill=accent)
-    _draw_right(draw, 1006, 1890, "ON THE RECORD / " + scope.upper(), _font(16, pixel=True), _MUTED)
+    _draw_right(draw, 1006, 1890, "SOURCE / " + scope.upper(), _font(16, pixel=True), _MUTED)
     return image

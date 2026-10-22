@@ -5,10 +5,11 @@ from typing import Any
 from vinylpi.core.spotify_stats import get_spotify_ranked_stats
 from vinylpi.core.spotify_genre_backfill import request_spotify_genre_backfill
 from vinylpi.web.services.stats import get_top_stats as get_vinyl_top_stats
+from vinylpi.core.annual_stats import get_yearly_ranked_stats
 
 
-def _vinyl_stats(limit: int) -> dict[str, Any]:
-    data = dict(get_vinyl_top_stats(limit=limit) or {})
+def _vinyl_stats(limit: int, year: int | None = None) -> dict[str, Any]:
+    data = dict((get_yearly_ranked_stats("vinyl", year, limit=limit) if year is not None else get_vinyl_top_stats(limit=limit)) or {})
     data["scope"] = "vinyl"
     data["album_count_unit"] = "session"
     return data
@@ -48,17 +49,18 @@ def _merge_named(left: list[dict], right: list[dict], *, limit: int) -> list[dic
     return _merge_ranked(left, right, key_fields=("name",), limit=limit)
 
 
-def get_scoped_stats(scope: str = "vinyl", *, limit: int = 10) -> dict[str, Any]:
+def get_scoped_stats(scope: str = "vinyl", *, limit: int = 10, year: int | None = None) -> dict[str, Any]:
     scope = str(scope or "vinyl").strip().lower()
     if scope == "spotify":
-        stats = get_spotify_ranked_stats(limit=limit)
+        stats = get_yearly_ranked_stats('spotify', year, limit=limit) if year is not None else get_spotify_ranked_stats(limit=limit)
         request_spotify_genre_backfill()
         return stats
     if scope != "combined":
-        return _vinyl_stats(limit)
+        return _vinyl_stats(limit, year)
 
-    vinyl = _vinyl_stats(limit=max(limit, 25))
-    spotify = get_spotify_ranked_stats(limit=max(limit, 25))
+    vinyl = _vinyl_stats(limit=max(limit, 100), year=year)
+    spotify = (get_yearly_ranked_stats('spotify', year, limit=100) if year is not None
+               else get_spotify_ranked_stats(limit=100))
     request_spotify_genre_backfill()
 
     genres = _merge_named(vinyl.get("top_genres") or [], spotify.get("top_genres") or [], limit=limit)
@@ -73,6 +75,7 @@ def get_scoped_stats(scope: str = "vinyl", *, limit: int = 10) -> dict[str, Any]
     coverage_s = spotify.get("metadata_coverage") or {}
     return {
         "scope": "combined",
+        "year": year,
         "top_songs": _merge_ranked(
             vinyl.get("top_songs") or [],
             spotify.get("top_songs") or [],

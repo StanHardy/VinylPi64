@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from vinylpi.core.database import get_connection, init_db
+from vinylpi.core.annual_stats import create_tables, seed_spotify, log_play, log_album, log_seconds
 from vinylpi.paths import get_active_db_path
 
 
@@ -24,6 +25,9 @@ def init_spotify_stats(db_path: Path | str | None = None) -> None:
         if key in _SPOTIFY_INITIALIZED_PATHS:
             return
         _create_spotify_schema(path)
+        with get_connection(path) as conn:
+            create_tables(conn)
+            seed_spotify(conn)
         _SPOTIFY_INITIALIZED_PATHS.add(key)
 
 
@@ -152,6 +156,8 @@ def record_spotify_play(
                 """,
                 (album, artist, cover_url, now),
             )
+            log_album(conn, 'spotify', album, occurred_at=now)
+        log_play(conn, 'spotify', track_id, artist, title, album, occurred_at=now)
 
 
 def add_spotify_listening_seconds(track_id: str, seconds: float) -> None:
@@ -179,6 +185,7 @@ def add_spotify_listening_seconds(track_id: str, seconds: float) -> None:
             """,
             (seconds, track_id),
         )
+        log_seconds(conn, 'spotify', 'listening', seconds)
 
 
 

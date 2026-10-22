@@ -110,8 +110,8 @@ function clearShareAsset() {
     shareAsset = { blob: null, file: null, url: null };
 }
 
-async function fetchShareAsset(scope) {
-    const response = await fetch(`/api/stats/share-card?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
+async function fetchShareAsset(scope, year = "all") {
+    const response = await fetch(`/api/stats/share-card?scope=${encodeURIComponent(scope)}&year=${encodeURIComponent(year)}`, { cache: "no-store" });
     if (!response.ok) {
         throw new Error(`Share card request failed: ${response.status}`);
     }
@@ -119,7 +119,7 @@ async function fetchShareAsset(scope) {
     const blob = await response.blob();
     clearShareAsset();
     shareAsset.blob = blob;
-    shareAsset.file = new File([blob], `vinylpi-on-the-record-${scope}.png`, { type: blob.type || "image/png" });
+    shareAsset.file = new File([blob], `vinylpi-spin-report-${scope}-${year}.png`, { type: blob.type || "image/png" });
     shareAsset.url = URL.createObjectURL(blob);
     return shareAsset;
 }
@@ -157,11 +157,13 @@ function setShareButtonProgress(value) {
 }
 
 function startShareButtonLoading() {
-    const button = document.getElementById("stats-share-button");
+    const button = document.getElementById("stats-share-button") || document.getElementById("stats-mobile-share");
     const label = document.getElementById("stats-share-button-label");
     if (!button || !label) return;
 
     let progress = 4;
+    const mobileButton = document.getElementById('stats-mobile-share');
+    if (mobileButton) mobileButton.disabled = true;
     button.disabled = true;
     button.classList.add("is-loading");
     label.textContent = "Preparing…";
@@ -193,6 +195,8 @@ function stopShareButtonLoading(success) {
 
     window.setTimeout(() => {
         button.disabled = false;
+        const mobileButton = document.getElementById('stats-mobile-share');
+        if (mobileButton) mobileButton.disabled = false;
         button.classList.remove("is-loading");
         label.textContent = "Share";
         setShareButtonProgress(0);
@@ -213,7 +217,8 @@ async function showSharePreview() {
     try {
         // Snapshot the active tab before the request; never silently export Vinyl.
         const scope = typeof vinylPiStatsScope === "string" ? vinylPiStatsScope : "vinyl";
-        const asset = await fetchShareAsset(scope);
+        const year = typeof vinylPiStatsYear === "string" ? vinylPiStatsYear : "all";
+        const asset = await fetchShareAsset(scope, year);
         const image = document.getElementById("stats-share-image");
         if (image) {
             image.src = asset.url;
@@ -234,7 +239,7 @@ async function shareFileWithNative() {
     }
 
     await navigator.share({
-        title: "VinylPi statistics",
+        title: "VinylPi Spin Report",
         files: [shareAsset.file],
     });
 }
@@ -246,7 +251,7 @@ function downloadShareImage() {
 
     const link = document.createElement("a");
     link.href = shareAsset.url;
-    link.download = shareAsset.file?.name || "vinylpi-on-the-record.png";
+    link.download = shareAsset.file?.name || "vinylpi-spin-report.png";
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -417,6 +422,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (shareButton) {
         shareButton.addEventListener("click", showSharePreview);
     }
+    const mobileShareButton = document.getElementById('stats-mobile-share');
+    if (mobileShareButton) mobileShareButton.addEventListener('click', showSharePreview);
     if (nativeShareButton) {
         nativeShareButton.addEventListener("click", () => handleShareAction("native"));
     }

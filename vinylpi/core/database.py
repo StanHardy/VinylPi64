@@ -8,7 +8,7 @@ from vinylpi.paths import DB_PATH, get_active_db_path
 
 _LEGACY_DB_PATH = DB_PATH
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 _INIT_LOCK = threading.Lock()
 _INITIALIZED_PATHS: set[str] = set()
 
@@ -412,6 +412,9 @@ def init_db(db_path: Path | str | None = None) -> None:
         with get_connection(path) as conn:
             _create_schema(conn)
             _migrate_schema(conn)
+            from vinylpi.core.annual_stats import create_tables, seed_vinyl
+            create_tables(conn)
+            seed_vinyl(conn)
             conn.execute(
                 "INSERT INTO meta(key, value) VALUES('schema_version', ?) "
                 "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

@@ -22,13 +22,25 @@
             <button type="button" class="stats-scope-button" data-stats-scope="spotify">Spotify</button>
             <button type="button" class="stats-scope-button" data-stats-scope="combined">Combined</button>
         </div>
+        <label class="stats-year-picker" for="stats-year-select">
+            <span>Period</span>
+            <select id="stats-year-select" aria-label="Statistics year">
+                <option value="all">All time</option>
+                <option value="2026">2026</option>
+            </select>
+        </label>
         {% include "components/profile_control.html" %}
     </header>
 
     <div class="stats-content-layout">
     <section class="stats-summary-row">
         <div class="stats-minutes-card page-intro-copy">
-            <span class="eyebrow" id="stats-overview-label">Vinyl listening overview</span>
+            <div class="stats-overview-top">
+                <span class="eyebrow" id="stats-overview-label">Vinyl listening overview</span>
+                <button id="stats-mobile-share" class="stats-mobile-share" type="button" aria-label="Share Spin Report" title="Share Spin Report">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4 M7 9l5-5 5 5 M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+                </button>
+            </div>
             <div class="stats-value-row">
                 <strong id="stats-minutes" class="stats-minutes-value">—</strong>
                 <span class="stats-unit">minutes</span>
@@ -70,7 +82,7 @@
         <aside id="stats-share-panel" class="stats-share-panel card">
             <div class="stats-share-panel-copy">
                 <span class="eyebrow">Share</span>
-                <h2>On the Record</h2>
+                <h2>Spin Report</h2>
                 <p id="stats-share-description">Turn your listening stats into a shareable card.</p>
             </div>
             <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Create share preview">
@@ -96,13 +108,13 @@
         <div class="stats-share-dialog-header">
             <div>
                 <span class="eyebrow">Share preview</span>
-                <h2 id="stats-share-title">On the Record</h2>
+                <h2 id="stats-share-title">Spin Report</h2>
             </div>
             <button id="stats-share-close" class="stats-share-close" type="button" aria-label="Close share dialog">×</button>
         </div>
 
         <div class="stats-share-preview-wrap">
-            <img id="stats-share-image" class="stats-share-image" alt="Preview of your On the Record listening statistics">
+            <img id="stats-share-image" class="stats-share-image" alt="Preview of your Spin Report listening statistics">
         </div>
 
         <div class="stats-share-action-row">

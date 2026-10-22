@@ -535,3 +535,32 @@ body.stats-share-open {
         max-height: calc(100vh - 16px);
     }
 }
+
+/* Period picker stays compact alongside the source selector. */
+.stats-year-picker { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; }
+.stats-year-picker select { background:var(--card-bg, #191921); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:9px 12px; font:inherit; color-scheme:dark; }
+.stats-overview-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.stats-mobile-share { display:none; width:42px; height:42px; flex:0 0 42px; align-items:center; justify-content:center; padding:9px; border:1px solid var(--border); border-radius:12px; color:var(--text); background:rgba(255,255,255,.06); cursor:pointer; }
+.stats-mobile-share svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+@media (max-width:980px) {
+    .stats-share-panel { display:none; }
+    .stats-content-layout { grid-template-areas:"overview" "statistics"; }
+    .stats-mobile-share { display:inline-flex; }
+}
+@media (max-width:650px) {
+    .stats-header-with-scope .stats-year-picker { order:3; }
+    .stats-year-picker span { display:none; }
+    .stats-year-picker select { padding:7px 9px; }
+}
+
+/* Override the shared Spotify-header grid (loaded after stats.css). */
+.main-header.stats-header-with-scope { grid-template-columns:minmax(0,1fr) auto auto auto; }
+@media (max-width:760px) {
+  .main-header.stats-header-with-scope { grid-template-columns:minmax(0,1fr) auto; }
+  .main-header.stats-header-with-scope .stats-scope-control { grid-column:1; grid-row:2; min-width:0; }
+  .main-header.stats-header-with-scope .stats-year-picker { grid-column:2; grid-row:2; }
+  .main-header.stats-header-with-scope .header-actions { grid-column:2; grid-row:1; }
+}
+@media (max-width:390px) {
+  .stats-header-with-scope .stats-scope-button { padding-inline:6px; font-size:10px; }
+}

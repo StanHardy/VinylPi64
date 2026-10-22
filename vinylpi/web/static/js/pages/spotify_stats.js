@@ -1,6 +1,7 @@
 /* Vinyl / Spotify / Combined statistics selector. Loaded after stats.js. */
 
 let vinylPiStatsScope = "vinyl";
+let vinylPiStatsYear = "all";
 let vinylPiStatsRequestId = 0;
 let vinylPiStatsController = null;
 // Keep already rendered scopes in memory while this page is open. Values are
@@ -115,22 +116,24 @@ function renderStats(data = {}) {
 
 async function loadStats() {
     const scope = vinylPiStatsScope;
+    const year = vinylPiStatsYear;
     const requestId = ++vinylPiStatsRequestId;
     vinylPiStatsController?.abort();
     const controller = new AbortController();
     vinylPiStatsController = controller;
     // Never display another tab's statistics under the newly selected tab.
     updateStatsScopeUI();
-    const cached = vinylPiStatsCache.get(scope);
+    const cacheKey = `${scope}:${year}`;
+    const cached = vinylPiStatsCache.get(cacheKey);
     renderStats(cached || {});
     try {
-        const response = await fetch(`/api/stats?scope=${encodeURIComponent(scope)}`, {
+        const response = await fetch(`/api/stats?scope=${encodeURIComponent(scope)}&year=${encodeURIComponent(year)}`, {
             cache: "no-store", signal: controller.signal,
         });
         if (!response.ok) throw new Error(`Statistics request failed: ${response.status}`);
         const data = await response.json();
-        if (requestId !== vinylPiStatsRequestId || scope !== vinylPiStatsScope) return;
-        vinylPiStatsCache.set(scope, data);
+        if (requestId !== vinylPiStatsRequestId || scope !== vinylPiStatsScope || year !== vinylPiStatsYear) return;
+        vinylPiStatsCache.set(cacheKey, data);
         // Chart.js and the album carousel are expensive on a Pi Zero. Avoid
         // rebuilding them when a background revalidation changed nothing.
         if (!cached || JSON.stringify(cached) !== JSON.stringify(data)) {
@@ -152,5 +155,21 @@ document.addEventListener("DOMContentLoaded", () => {
             loadStats();
         });
     });
+    const yearPicker = document.getElementById('stats-year-select');
+    if (yearPicker) {
+        yearPicker.addEventListener('change', () => {
+            vinylPiStatsYear = yearPicker.value || 'all';
+            loadStats();
+        });
+        fetch('/api/stats/years', {cache: 'no-store'})
+            .then(response => response.ok ? response.json() : Promise.reject(response.status))
+            .then(data => {
+                const selected = vinylPiStatsYear;
+                yearPicker.replaceChildren(new Option('All time', 'all'));
+                (data.years || []).forEach(year => yearPicker.add(new Option(String(year), String(year))));
+                yearPicker.value = selected;
+            })
+            .catch(error => console.warn('Could not load available statistics years:', error));
+    }
     updateStatsScopeUI();
 });
