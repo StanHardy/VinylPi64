@@ -4,6 +4,7 @@ import sys
 import os
 from typing import Optional
 from vinylpi.paths import BASE_DIR
+from vinylpi.integrations.home_assistant import send_vinyl_started
 
 _recognizer_proc: Optional[subprocess.Popen] = None
 _lock = threading.Lock()
@@ -25,7 +26,8 @@ def start(*, silence_output: bool, start_origin: str = "manual") -> bool:
 
         cmd = [sys.executable, "-u", "-m", "vinylpi.main"]
         env = os.environ.copy()
-        env["VINYLPI_START_ORIGIN"] = "auto_wake" if start_origin == "auto_wake" else "manual"
+        origin = "auto_wake" if start_origin == "auto_wake" else "manual"
+        env["VINYLPI_START_ORIGIN"] = origin
 
         if silence_output:
             _recognizer_proc = subprocess.Popen(
@@ -38,7 +40,11 @@ def start(*, silence_output: bool, start_origin: str = "manual") -> bool:
         else:
             _recognizer_proc = subprocess.Popen(cmd, cwd=BASE_DIR, env=env)
 
-        return True
+    # All entry points (dashboard, auto wake, legacy API) arrive here.
+    # Notify only after spawning a NEW recognizer; repeated starts do not fire.
+    # HA request failures do not prevent recognition from starting.
+    send_vinyl_started(reason=origin)
+    return True
 
 def stop() -> bool:
     global _recognizer_proc

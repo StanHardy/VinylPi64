@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261022-ha-wake" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261022-vinyl-start" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -650,11 +650,7 @@
                                 <div class="form-row"><label for="baseURL">Base URL</label><input type="text" id="baseURL" placeholder="http://homeassistant:8123"></div>
                                 <div class="form-row"><label for="webHookID">Webhook ID · Color sync</label><input type="text" id="webHookID" placeholder="vinylpi_cover_color"></div>
                                 <div class="form-row"><label for="haStopWebhookID">Webhook ID · On shutdown</label><input type="text" id="haStopWebhookID" placeholder="Enter a webhook ID"></div>
-                                <div class="form-row"><label for="haWakeWebhookEnabled">Pixoo on · Auto wake</label><input type="checkbox" id="haWakeWebhookEnabled"></div>
-                                <div data-setting-row="ha-wake-webhook-details">
-                                    <div class="form-row"><label for="haWakeWebhookID">Webhook ID · On auto wake</label><input type="text" id="haWakeWebhookID" placeholder="Enter a separate webhook ID"></div>
-                                    <div class="form-hint">When Vinyl wakes from USB audio, send this webhook once. Configure its HA automation to call the existing Pixoo On command. Manual starts are not affected.</div>
-                                </div>
+                                <div class="form-row"><label for="haWakeWebhookID">Webhook ID · On Vinyl start</label><input type="text" id="haWakeWebhookID" placeholder="Leave empty to disable"></div>
                             </div>
                         </div>
                     </div>

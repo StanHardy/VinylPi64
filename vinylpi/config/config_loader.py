@@ -110,8 +110,8 @@ CONFIG_DEFAULTS = {
         "webhook_id": "vinylpi_cover_color",
         # Dedicated Off-event webhook; an empty ID disables only this event.
         "stop_webhook_id": "",
-        # Optional Pixoo-on event, sent only on an actual audio-triggered wake.
-        "wake_webhook_enabled": False,
+        # Optional Pixoo-on notification when Vinyl recognition starts.
+        # An empty ID disables the notification (no additional switch).
         "wake_webhook_id": ""
     }
 }

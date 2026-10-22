@@ -81,15 +81,15 @@ def send_recognition_stopped(*, source: str, reason: str) -> bool:
     return True
 
 
-def send_auto_wake() -> bool:
-    """Notify HA after an Off -> Vinyl auto-wake transition.
+def send_vinyl_started(*, reason: str) -> bool:
+    """Notify HA once when Vinyl recognition actually starts.
 
-    HA can use this dedicated webhook to call its existing Pixoo-on action.
-    This must never reuse the color-sync or shutdown webhook. Failures must
-    not interrupt recognition; the caller is the background wake coordinator.
+    Used for both manual and automatic starts. The dedicated webhook is
+    optional; an empty ID disables it. A failed HA request must never
+    prevent recognition from running.
     """
     ha_cfg = read_config().get("homeassistant") or {}
-    if not ha_cfg.get("use_ha", False) or not ha_cfg.get("wake_webhook_enabled", False):
+    if not ha_cfg.get("use_ha", False):
         return False
 
     base_url = str(ha_cfg.get("base_url") or "").strip().rstrip("/")
@@ -100,10 +100,10 @@ def send_auto_wake() -> bool:
     try:
         _session.post(
             f"{base_url}/api/webhook/{webhook_id}",
-            json={"event": "auto_wake", "source": "vinyl", "action": "pixoo_on"},
+            json={"event": "vinyl_started", "source": "vinyl", "reason": reason, "action": "pixoo_on"},
             timeout=2,
         ).raise_for_status()
     except requests.RequestException as exc:
-        print(f"[HA] Failed sending auto-wake event: {exc}")
+        print(f"[HA] Failed sending vinyl-started event: {exc}")
         return False
     return True
