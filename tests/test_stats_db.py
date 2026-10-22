@@ -10,7 +10,7 @@ from unittest.mock import patch
 from PIL import Image
 
 from vinylpi.core import database, stats_db
-from vinylpi.web.services.stats import build_share_card_image
+from vinylpi.web.services.stats import build_share_card_image, get_share_card_payload
 
 warnings.filterwarnings("ignore", category=ResourceWarning, message="unclosed database.*")
 
@@ -113,6 +113,46 @@ class StatsDatabaseTests(unittest.TestCase):
         stats_db.update_song_stats("Artist", "Song")
 
         self.assertTrue(database.database_has_statistics())
+
+    @patch("vinylpi.web.services.stats_scoped.get_scoped_stats")
+    @patch("vinylpi.web.services.stats.get_active_profile", return_value={"name": "Simon"})
+    def test_share_card_payload_uses_selected_scope(self, _profile, get_stats):
+        get_stats.return_value = {
+            "top_artists": [{"name": "Artist", "count": 8}],
+            "top_albums": [{"name": "Album", "count": 3}],
+            "top_genres": [{"name": "Rock", "count": 7}],
+            "total_minutes_listened": 90,
+            "pickup_usage_seconds": 3600,
+            "album_count_unit": "play",
+        }
+        spotify = get_share_card_payload(scope="spotify")
+        self.assertEqual(spotify["scope"], "spotify")
+        self.assertIsNone(spotify["pickup_usage_seconds"])
+        self.assertEqual(spotify["top_genres"], [{"name": "Rock", "count": 7}])
+        get_stats.assert_called_with(scope="spotify", limit=10)
+        combined = get_share_card_payload(scope="combined")
+        self.assertEqual(combined["scope"], "combined")
+        get_stats.assert_called_with(scope="combined", limit=10)
+        vinyl = get_share_card_payload(scope="vinyl")
+        self.assertEqual(vinyl["pickup_usage_seconds"], 3600)
+        get_stats.assert_called_with(scope="vinyl", limit=10)
+
+    def test_share_card_generation_all_scopes(self):
+        for scope in ("vinyl", "spotify", "combined"):
+            with self.subTest(scope=scope):
+                payload = {
+                    "scope": scope,
+                    "profile_name": "Simon",
+                    "total_minutes_listened": 1234,
+                    "pickup_usage_seconds": 3600 if scope == "vinyl" else None,
+                    "top_artists": [{"name": "Artist", "count": 27}],
+                    "top_albums": [{"name": "A very long album title that has to wrap correctly", "count": 9}],
+                    "top_genres": [{"name": "Alternative", "count": 17}],
+                    "top_album_covers": [],
+                }
+                with Image.open(io.BytesIO(build_share_card_image(payload))) as image:
+                    self.assertEqual(image.size, (1080, 1920))
+                    self.assertEqual(image.mode, "RGB")
 
     def test_share_card_generation_returns_valid_png(self):
         payload = {

@@ -4,7 +4,7 @@ import io
 from typing import Any
 
 import requests
-from PIL import Image, ImageDraw, ImageFilter, ImageFont, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 from vinylpi.core.stats_db import get_ranked_stats
 from vinylpi.paths import FONTS_DIR
@@ -43,25 +43,30 @@ def get_top_stats(limit: int = 10) -> dict:
         return _empty_stats_payload()
 
 
-def get_share_card_payload(limit: int = 5) -> dict[str, Any]:
-    stats = get_top_stats(limit=max(5, int(limit)))
-    active_profile = get_active_profile()
-    top_genres = stats.get("top_genres") or []
-    top_genre = (top_genres[0] or {}).get("name") if top_genres else None
+def get_share_card_payload(limit: int = 5, *, scope: str = "vinyl") -> dict[str, Any]:
+    # Resolve all three sources through the same aggregation used on /stats.html.
+    # Import here to avoid the stats_scoped -> stats circular import at module load.
+    from vinylpi.web.services.stats_scoped import get_scoped_stats
 
+    scope = scope if scope in {"vinyl", "spotify", "combined"} else "vinyl"
+    stats = get_scoped_stats(scope=scope, limit=max(10, int(limit)))
+    profile = get_active_profile() or {}
+    genres = list(stats.get("top_genres") or [])[:5]
     return {
-        "profile_name": (active_profile or {}).get("name") or "Guest",
-        "is_guest": bool((active_profile or {}).get("is_guest")),
+        "scope": scope,
+        "profile_name": profile.get("name") or "Guest",
         "total_minutes_listened": int(stats.get("total_minutes_listened") or 0),
-        "top_genre": top_genre or "Unknown",
+        "pickup_usage_seconds": float(stats.get("pickup_usage_seconds") or 0.0) if scope == "vinyl" else None,
         "top_artists": list(stats.get("top_artists") or [])[:5],
         "top_albums": list(stats.get("top_albums") or [])[:5],
         "top_album_covers": list(stats.get("top_album_covers") or [])[:_SHARE_CARD_MAX_COVERS],
+        "top_genres": genres,
+        "album_count_unit": stats.get("album_count_unit") or ("session" if scope == "vinyl" else "play"),
     }
 
 
-def build_share_card_image(payload: dict[str, Any] | None = None) -> bytes:
-    data = payload or get_share_card_payload(limit=5)
+def build_share_card_image(payload: dict[str, Any] | None = None, *, scope: str = "vinyl") -> bytes:
+    data = payload if payload is not None else get_share_card_payload(limit=5, scope=scope)
     image = _create_share_card(data)
     output = io.BytesIO()
     image.save(output, format="PNG", optimize=True)
@@ -70,7 +75,7 @@ def build_share_card_image(payload: dict[str, Any] | None = None) -> bytes:
 
 def _font(size: int, *, bold: bool = False, pixel: bool = False) -> ImageFont.FreeTypeFont:
     if pixel:
-        filename = "Pixel5.ttf"
+        filename = "VCR_OSD_MONO_1.001.ttf"
     elif bold:
         filename = "DejaVuSans-Bold.ttf"
     else:
@@ -86,7 +91,7 @@ def _font(size: int, *, bold: bool = False, pixel: bool = False) -> ImageFont.Fr
         else:
             font = ImageFont.truetype(filename, size)
     except Exception:
-        fallback_path = FONTS_DIR / ("Pixel5.ttf" if pixel else "vinylpixel.ttf")
+        fallback_path = FONTS_DIR / ("VCR_OSD_MONO_1.001.ttf" if pixel else "vinylpixel.ttf")
         try:
             font = ImageFont.truetype(str(fallback_path), size)
         except Exception:
@@ -156,264 +161,211 @@ def _wrap_text_lines(
     return lines[:max_lines]
 
 
-def _draw_gradient_background(size: tuple[int, int]) -> Image.Image:
-    width, height = size
-    image = Image.new("RGBA", size, (18, 18, 28, 255))
+# A record-sleeve-inspired layout: dark, quiet surfaces, hairline rules and
+# precise columns. All album artwork stays inside fixed rectangular slots.
+_INK = (13, 15, 21)
+_PANEL = (23, 25, 33)
+_SURFACE = (17, 19, 26)
+_WHITE = (244, 245, 248)
+_MUTED = (155, 161, 177)
+_LINE = (59, 63, 77)
+
+
+def _accent(scope: str) -> tuple[int, int, int]:
+    return {
+        "vinyl": (245, 197, 66),
+        "spotify": (113, 226, 166),
+        "combined": (225, 156, 241),
+    }.get(scope, (245, 197, 66))
+
+
+def _draw_background(size: tuple[int, int], accent: tuple[int, int, int]) -> Image.Image:
+    image = Image.new("RGB", size, _INK)
     draw = ImageDraw.Draw(image)
-
-    top = (141, 130, 255)
-    middle = (88, 62, 178)
-    bottom = (18, 17, 26)
-    for y in range(height):
-        t = y / max(height - 1, 1)
-        if t < 0.58:
-            local = t / 0.58
-            color = tuple(int(top[i] + (middle[i] - top[i]) * local) for i in range(3))
-        else:
-            local = (t - 0.58) / 0.42
-            color = tuple(int(middle[i] + (bottom[i] - middle[i]) * local) for i in range(3))
-        draw.line((0, y, width, y), fill=color + (255,))
-
-    glow = Image.new("RGBA", size, (0, 0, 0, 0))
-    glow_draw = ImageDraw.Draw(glow)
-    glow_draw.ellipse((-120, -60, 520, 520), fill=(252, 218, 116, 110))
-    glow_draw.ellipse((690, 40, 1180, 520), fill=(239, 45, 143, 110))
-    glow_draw.ellipse((700, 1180, 1240, 1760), fill=(124, 58, 237, 130))
-    glow_draw.ellipse((-160, 1220, 420, 1820), fill=(245, 197, 66, 90))
-    glow = glow.filter(ImageFilter.GaussianBlur(120))
-    return Image.alpha_composite(image, glow)
+    # A subtle vinyl-disc engraving in the upper right, without any gradient.
+    cx, cy = 912, 235
+    for radius in range(130, 550, 10):
+        color = (30, 32, 42) if radius % 40 else (40, 43, 54)
+        draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), outline=color, width=1)
+    draw.ellipse((cx-56, cy-56, cx+56, cy+56), fill=(27, 29, 38), outline=(49, 52, 65), width=3)
+    draw.ellipse((cx-8, cy-8, cx+8, cy+8), fill=accent)
+    # A thin print registration line evokes a physical record sleeve.
+    draw.rectangle((72, 41, 1008, 45), fill=accent)
+    return image
 
 
-def _panel(
-    draw: ImageDraw.ImageDraw,
-    box: tuple[int, int, int, int],
-    *,
-    fill: tuple[int, int, int, int] = (21, 21, 30, 188),
-    outline: tuple[int, int, int, int] = (255, 255, 255, 38),
-) -> None:
-    draw.rounded_rectangle(box, radius=_SHARE_CARD_PANEL_RADIUS, fill=fill, outline=outline, width=2)
+def _panel(draw: ImageDraw.ImageDraw, rect: tuple[int, int, int, int]) -> None:
+    draw.rounded_rectangle(rect, radius=28, fill=_PANEL, outline=_LINE, width=2)
+
+
+def _draw_right(draw: ImageDraw.ImageDraw, x: int, y: int, text: str, font: ImageFont.FreeTypeFont, fill) -> None:
+    width, _ = _text_size(draw, text, font)
+    draw.text((x-width, y), text, font=font, fill=fill)
+
+
+def _duration(seconds: float) -> str:
+    total_minutes = max(0, round(float(seconds or 0) / 60))
+    hours, mins = divmod(total_minutes, 60)
+    return f"{hours:,} h {mins:02d} min" if hours else f"{mins:,} min"
 
 
 def _fetch_cover(url: str | None, size: tuple[int, int]) -> Image.Image | None:
-    if not url:
+    if not url or not str(url).startswith(("https://", "http://")):
         return None
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=5)
         response.raise_for_status()
+        # Album thumbnails never need multi-megabyte images.
+        if len(response.content) > 5_000_000:
+            return None
         with Image.open(io.BytesIO(response.content)) as source:
-            image = ImageOps.exif_transpose(source).convert("RGB")
-            image = ImageOps.fit(image, size, method=Image.Resampling.LANCZOS, centering=(0.5, 0.5))
-            image.load()
-        return image
+            cover = ImageOps.fit(
+                ImageOps.exif_transpose(source).convert("RGB"), size,
+                method=Image.Resampling.LANCZOS,
+            )
+            cover.load()
+        return cover
     except Exception:
         return None
 
 
-def _make_cover_tile(cover: Image.Image, *, radius: int = 28, border: int = 10) -> Image.Image:
-    size = cover.size[0]
-    canvas = Image.new("RGBA", (size + border * 2, size + border * 2), (0, 0, 0, 0))
-    shadow = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    shadow_draw = ImageDraw.Draw(shadow)
-    shadow_draw.rounded_rectangle(
-        (border - 2, border + 10, border + size + 2, border + size + 14),
-        radius=radius + 4,
-        fill=(0, 0, 0, 92),
-    )
-    shadow = shadow.filter(ImageFilter.GaussianBlur(18))
-    canvas.alpha_composite(shadow)
-
-    frame = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
-    frame_draw = ImageDraw.Draw(frame)
-    frame_draw.rounded_rectangle(
-        (border - 1, border - 1, border + size + 1, border + size + 1),
-        radius=radius + 2,
-        fill=(248, 248, 252, 255),
-    )
-
-    mask = Image.new("L", (size, size), 0)
-    mask_draw = ImageDraw.Draw(mask)
-    mask_draw.rounded_rectangle((0, 0, size, size), radius=radius, fill=255)
-
-    cover_rgba = cover.convert("RGBA")
-    clipped = Image.new("RGBA", (size, size), (0, 0, 0, 0))
-    clipped.paste(cover_rgba, (0, 0), mask)
-
-    frame.alpha_composite(clipped, (border, border))
-    canvas.alpha_composite(frame)
-    return canvas
+def _draw_empty_record(draw: ImageDraw.ImageDraw, rect: tuple[int, int, int, int], accent) -> None:
+    left, top, right, bottom = rect
+    draw.rounded_rectangle(rect, radius=12, fill=(37, 39, 49))
+    cx, cy = (left+right)//2, (top+bottom)//2
+    radius = (right-left)//2-13
+    draw.ellipse((cx-radius, cy-radius, cx+radius, cy+radius), fill=(15, 16, 22))
+    for inner in range(20, radius, 12):
+        draw.ellipse((cx-inner, cy-inner, cx+inner, cy+inner), outline=(55, 57, 67), width=2)
+    draw.ellipse((cx-27, cy-27, cx+27, cy+27), fill=accent)
+    draw.ellipse((cx-4, cy-4, cx+4, cy+4), fill=_INK)
 
 
-def _draw_cover_stack(base: Image.Image, payload: dict[str, Any], box: tuple[int, int, int, int]) -> None:
-    source_items = list(payload.get("top_album_covers") or [])[:_SHARE_CARD_MAX_COVERS]
-    if not source_items:
+def _draw_cover_gallery(draw: ImageDraw.ImageDraw, image: Image.Image, payload: dict[str, Any], accent) -> None:
+    _panel(draw, (72, 712, 1008, 1026))
+    draw.text((100, 738), "IN ROTATION", font=_font(23, bold=True), fill=_WHITE)
+    _draw_right(draw, 979, 743, "TOP ALBUM ART", _font(17, pixel=True), accent)
+
+    covers = list(payload.get("top_album_covers") or [])[:3]
+    columns = ((94, 378), (398, 682), (702, 986))
+    for index, (left, right) in enumerate(columns):
+        draw.rounded_rectangle((left, 787, right, 1002), radius=17, fill=_SURFACE, outline=(44, 48, 61), width=1)
+        cover_rect = (left + 62, 796, left + 222, 956)
+        item = covers[index] if index < len(covers) else {}
+        cover = _fetch_cover(item.get("cover_url"), (160, 160))
+        if cover is None:
+            _draw_empty_record(draw, cover_rect, accent)
+        else:
+            mask = Image.new("L", (160, 160))
+            ImageDraw.Draw(mask).rounded_rectangle((0, 0, 159, 159), radius=11, fill=255)
+            image.paste(cover, (cover_rect[0], cover_rect[1]), mask)
+        title = _fit_text(draw, str(item.get("name") or "—"), _font(18, bold=True), right-left-32)
+        title_w, _ = _text_size(draw, title, _font(18, bold=True))
+        draw.text((left + (right-left-title_w)//2, 963), title, font=_font(18, bold=True), fill=_WHITE)
+
+
+def _draw_ranked(draw: ImageDraw.ImageDraw, label: str, items: list[dict[str, Any]], rect, accent, unit: str) -> None:
+    _panel(draw, rect)
+    left, top, right, bottom = rect
+    draw.text((left+26, top+25), label, font=_font(27, bold=True), fill=_WHITE)
+    _draw_right(draw, right-26, top+34, unit.upper(), _font(17, pixel=True), accent)
+    for i in range(5):
+        y = top + 88 + i*83
+        draw.rounded_rectangle((left+18, y, right-18, y+73), radius=14, fill=_SURFACE)
+        draw.text((left+29, y+21), f"{i+1:02d}", font=_font(19, bold=True), fill=accent)
+        item = items[i] if i < len(items) else {}
+        name = str(item.get("name") or "—")
+        count = str(int(item.get("count") or 0)) if item else "—"
+        count_font = _font(28, bold=True)
+        count_w, _ = _text_size(draw, count, count_font)
+        # Reserve the width of the numeric column even for four-digit counts.
+        name_max = max(95, right-left-126-count_w)
+        lines = _wrap_text_lines(draw, name, _font(20, bold=True), name_max, max_lines=2)
+        if len(lines) > 1:
+            for n, line in enumerate(lines):
+                draw.text((left+69, y+11+n*25), line, font=_font(20, bold=True), fill=_WHITE)
+        else:
+            draw.text((left+69, y+23), lines[0], font=_font(20, bold=True), fill=_WHITE)
+        _draw_right(draw, right-31, y+19, count, count_font, accent)
+
+
+def _draw_genres(draw: ImageDraw.ImageDraw, payload: dict[str, Any], accent) -> None:
+    _panel(draw, (72, 1632, 1008, 1848))
+    draw.text((100, 1654), "TOP GENRES", font=_font(26, bold=True), fill=_WHITE)
+    draw.text((792, 1662), "PLAYS", font=_font(17, pixel=True), fill=accent)
+    genres = list(payload.get("top_genres") or [])[:5]
+    if not genres and payload.get("top_genre"):
+        genres = [{"name": payload["top_genre"], "count": 0}]
+    if not genres:
+        draw.text((104, 1733), "No genre data available yet.", font=_font(23), fill=_MUTED)
         return
-
-    left, top, right, bottom = box
-    available_w = right - left
-    available_h = bottom - top
-    cover_size = min(available_w // 2, available_h - 20, 228)
-
-    covers = []
-    for item in source_items:
-        cover = _fetch_cover(item.get("cover_url"), (cover_size, cover_size))
-        if cover is not None:
-            covers.append(_make_cover_tile(cover))
-
-    if not covers:
-        return
-
-    placements = [
-        (left + 12, top + 118, -11),
-        (left + 128, top + 36, 6),
-        (left + 252, top + 114, 13),
-    ]
-    placements = placements[: len(covers)]
-
-    for tile, placement in zip(covers, placements, strict=False):
-        x, y, angle = placement
-        rotated = tile.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True)
-        base.alpha_composite(rotated, (x, y))
-
-
-def _draw_list_card(
-    draw: ImageDraw.ImageDraw,
-    title: str,
-    items: list[dict[str, Any]],
-    box: tuple[int, int, int, int],
-    *,
-    count_label: str,
-    accent: tuple[int, int, int],
-) -> None:
-    _panel(draw, box)
-    left, top, right, bottom = box
-    padding_x = 30
-    padding_y = 24
-
-    title_font = _font(30, bold=True)
-    item_font = _font(23, bold=True)
-    count_font = _font(21, bold=True)
-    meta_font = _font(16, pixel=True)
-
-    draw.text((left + padding_x, top + padding_y), title, font=title_font, fill=(255, 255, 255, 245))
-    label_text = count_label.upper()
-    label_w, _ = _text_size(draw, label_text, meta_font)
-    draw.text((right - padding_x - label_w, top + padding_y + 10), label_text, font=meta_font, fill=accent)
-
-    if not items:
-        empty_font = _font(26)
-        draw.text((left + padding_x, top + 96), "No listening data yet.", font=empty_font, fill=(220, 220, 230, 210))
-        return
-
-    start_y = top + 100
-    row_h = 76
-    line_h = 96
-    line_gap = 4
-    content_left = left + padding_x + 38
-    content_right = right - padding_x - 74
-    max_name_width = max(96, content_right - content_left)
-
-    for index, item in enumerate(items[:5], start=1):
-        y = start_y + (index - 1) * line_h
-        draw.rounded_rectangle(
-            (left + 18, y - 10, right - 18, y + row_h),
-            radius=24,
-            fill=(11, 11, 16, 205),
-            outline=(255, 255, 255, 36),
-            width=2,
-        )
-        draw.text((left + padding_x, y + 12), f"{index}", font=item_font, fill=accent)
-
-        name = item.get("name") or item.get("title") or "Unknown"
-        lines = _wrap_text_lines(draw, name, item_font, max_width=max_name_width, max_lines=2)
-        text_y = y + (8 if len(lines) > 1 else 18)
-        for line_index, line in enumerate(lines):
-            draw.text(
-                (content_left, text_y + line_index * (item_font.size + line_gap)),
-                line,
-                font=item_font,
-                fill=(255, 255, 255, 245),
-            )
-
-        count_raw = int(item.get("count") or 0)
-        count_text = f"{count_raw:,}"
-        count_w, count_h = _text_size(draw, count_text, count_font)
-        count_y = y + (row_h - count_h) / 2 - 4
-        draw.text((right - padding_x - count_w, count_y), count_text, font=count_font, fill=(235, 235, 243, 235))
+    # Two columns: entries 1–3 on the left, 4–5 on the right.
+    for i, entry in enumerate(genres):
+        col = 0 if i < 3 else 1
+        row = i if col == 0 else i-3
+        x = 103 if col == 0 else 559
+        y = 1704 + row*45
+        draw.text((x, y), f"{i+1:02d}", font=_font(20, bold=True), fill=accent)
+        name = _fit_text(draw, str(entry.get("name") or "Unknown"), _font(21, bold=True), 300)
+        draw.text((x+44, y), name, font=_font(21, bold=True), fill=_WHITE)
+        count = str(int(entry.get("count") or 0))
+        _draw_right(draw, x+413, y, count, _font(21, bold=True), accent)
 
 
 def _create_share_card(payload: dict[str, Any]) -> Image.Image:
     width, height = _SHARE_CARD_SIZE
-    image = _draw_gradient_background(_SHARE_CARD_SIZE)
+    scope = str(payload.get("scope") or "vinyl").lower()
+    if scope not in {"vinyl", "spotify", "combined"}:
+        scope = "vinyl"
+    accent = _accent(scope)
+    image = _draw_background((width, height), accent)
     draw = ImageDraw.Draw(image)
 
-    badge_font = _font(26, pixel=True)
-    heading_font = _font(72, bold=True)
-    profile_font = _font(28, bold=True)
-    eyebrow_font = _font(22, pixel=True)
-    metric_font = _font(118, bold=True)
-    metric_sub_font = _font(30, bold=True)
-    genre_label_font = _font(22, pixel=True)
-    genre_value_font = _font(52, bold=True)
+    draw.text((72, 69), "VINYLPI  /  LISTENING LOG", font=_font(22, pixel=True), fill=accent)
+    _draw_right(draw, 1008, 70, "01 / STATS", _font(17, pixel=True), _MUTED)
+    draw.line((72, 119, 1008, 119), fill=_LINE, width=2)
 
-    left = _SHARE_CARD_MARGIN
-    right = width - _SHARE_CARD_MARGIN
+    draw.text((72, 153), "On the Record.", font=_font(76, bold=True), fill=_WHITE)
+    draw.text((76, 265), "A little history of what you listened to.", font=_font(26), fill=_MUTED)
 
-    badge_text = "VINYL WRAPPED"
-    badge_w, badge_h = _text_size(draw, badge_text, badge_font)
-    badge_box = (left, 64, left + badge_w + 54, 64 + badge_h + 34)
-    draw.rounded_rectangle(badge_box, radius=26, fill=(25, 25, 34, 170), outline=(255, 255, 255, 42), width=2)
-    draw.text((left + 24, 86), badge_text, font=badge_font, fill=(255, 255, 255, 245))
+    pill = scope.upper()
+    label_font = _font(23, bold=True)
+    pill_w, _ = _text_size(draw, pill, label_font)
+    draw.rounded_rectangle((73, 325, 119+pill_w, 380), radius=15, fill=accent)
+    draw.text((95, 338), pill, font=label_font, fill=_INK)
+    profile = _fit_text(draw, str(payload.get("profile_name") or "Guest"), _font(24, bold=True), 430)
+    _draw_right(draw, 1008, 339, f"{profile}", _font(24, bold=True), _WHITE)
 
-    draw.text((left, 160), "Your Vinyl Statistics", font=heading_font, fill=(255, 255, 255, 248))
+    _panel(draw, (72, 409, 1008, 689))
+    draw.text((105, 448), "TOTAL LISTENING TIME", font=_font(21, pixel=True), fill=accent)
+    minutes = f"{int(payload.get('total_minutes_listened') or 0):,}"
+    metric_font = _font(116 if len(minutes) <= 6 else 90, bold=True)
+    metric = _fit_text(draw, minutes, metric_font, 514)
+    draw.text((98, 491), metric, font=metric_font, fill=_WHITE)
+    draw.text((106, 615), "minutes listened", font=_font(28), fill=_MUTED)
+    draw.line((652, 453, 652, 647), fill=_LINE, width=2)
 
-    profile_name = str(payload.get("profile_name") or "Guest")
-    profile_text = _fit_text(draw, profile_name, profile_font, max_width=420)
-    profile_w, profile_h = _text_size(draw, profile_text, profile_font)
-    profile_box = (left, 272, left + profile_w + 52, 272 + profile_h + 30)
-    draw.rounded_rectangle(profile_box, radius=24, fill=(17, 17, 24, 150), outline=(255, 255, 255, 38), width=2)
-    profile_x = profile_box[0] + ((profile_box[2] - profile_box[0]) - profile_w) / 2
-    profile_y = profile_box[1] + ((profile_box[3] - profile_box[1]) - profile_h) / 2 - 2
-    draw.text((profile_x, profile_y), profile_text, font=profile_font, fill=(248, 248, 252, 235))
+    if scope == "vinyl":
+        draw.text((689, 488), "PICKUP USAGE", font=_font(19, pixel=True), fill=accent)
+        draw.text((688, 540), _duration(payload.get("pickup_usage_seconds") or 0),
+                  font=_font(30, bold=True), fill=_WHITE)
+        draw.text((689, 598), "USB audio activity", font=_font(19), fill=_MUTED)
+    else:
+        draw.text((689, 488), "SOURCE", font=_font(19, pixel=True), fill=accent)
+        source_name = "Spotify" if scope == "spotify" else "Vinyl + Spotify"
+        draw.text((688, 540), source_name, font=_font(27, bold=True), fill=_WHITE)
+        draw.text((689, 598), "Listening history", font=_font(19), fill=_MUTED)
 
-    hero_box = (left, 380, right, 860)
-    _panel(draw, hero_box, fill=(17, 17, 24, 176), outline=(255, 255, 255, 44))
+    _draw_cover_gallery(draw, image, payload, accent)
+    album_unit = str(payload.get("album_count_unit") or ("session" if scope == "vinyl" else "play"))
+    album_unit_label = "SESSIONS" if album_unit == "session" else ("LISTENS" if album_unit == "listen" else "PLAYS")
+    _draw_ranked(draw, "Top 5 artists", list(payload.get("top_artists") or []),
+                 (72, 1052, 529, 1608), accent, "plays")
+    _draw_ranked(draw, "Top 5 albums", list(payload.get("top_albums") or []),
+                 (551, 1052, 1008, 1608), accent, album_unit_label)
+    _draw_genres(draw, payload, accent)
 
-    draw.text((left + 42, 430), "MINUTES LISTENED", font=eyebrow_font, fill=(245, 197, 66, 255))
-    minutes = int(payload.get("total_minutes_listened") or 0)
-    minutes_text = f"{minutes:,}"
-    draw.text((left + 38, 500), minutes_text, font=metric_font, fill=(255, 255, 255, 250))
-    draw.text((left + 42, 650), "minutes listened", font=metric_sub_font, fill=(245, 245, 248, 225))
-
-    _draw_cover_stack(image, payload, (right - 396, 422, right - 26, 816))
-
-    artists_box = (left, 920, left + (right - left) // 2 - 10, 1548)
-    albums_box = (left + (right - left) // 2 + 10, 920, right, 1548)
-    _draw_list_card(
-        draw,
-        "Top 5 Artists",
-        list(payload.get("top_artists") or []),
-        artists_box,
-        count_label="plays",
-        accent=(245, 197, 66),
-    )
-    _draw_list_card(
-        draw,
-        "Top 5 Albums",
-        list(payload.get("top_albums") or []),
-        albums_box,
-        count_label="sessions",
-        accent=(239, 157, 217),
-    )
-
-    footer_box = (left, 1600, right, 1816)
-    _panel(draw, footer_box, fill=(16, 16, 22, 172), outline=(255, 255, 255, 34))
-
-    genre_label = "TOP GENRE"
-    genre_value = _fit_text(draw, str(payload.get("top_genre") or "Unknown"), genre_value_font, max_width=760)
-    genre_label_w, genre_label_h = _text_size(draw, genre_label, genre_label_font)
-    genre_value_w, genre_value_h = _text_size(draw, genre_value, genre_value_font)
-    center_x = (left + right) // 2
-    draw.text((center_x - genre_label_w // 2, 1650), genre_label, font=genre_label_font, fill=(245, 197, 66, 255))
-    draw.text((center_x - genre_value_w // 2, 1706), genre_value, font=genre_value_font, fill=(255, 255, 255, 245))
-
-    return image.convert("RGB")
+    draw.line((72, 1880, 1008, 1880), fill=_LINE, width=2)
+    draw.text((74, 1890), "VINYLPI64", font=_font(17, pixel=True), fill=accent)
+    _draw_right(draw, 1006, 1890, "ON THE RECORD / " + scope.upper(), _font(16, pixel=True), _MUTED)
+    return image

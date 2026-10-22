@@ -110,8 +110,8 @@ function clearShareAsset() {
     shareAsset = { blob: null, file: null, url: null };
 }
 
-async function fetchShareAsset() {
-    const response = await fetch("/api/stats/share-card", { cache: "no-store" });
+async function fetchShareAsset(scope) {
+    const response = await fetch(`/api/stats/share-card?scope=${encodeURIComponent(scope)}`, { cache: "no-store" });
     if (!response.ok) {
         throw new Error(`Share card request failed: ${response.status}`);
     }
@@ -119,7 +119,7 @@ async function fetchShareAsset() {
     const blob = await response.blob();
     clearShareAsset();
     shareAsset.blob = blob;
-    shareAsset.file = new File([blob], "vinylpi-wrapped.png", { type: blob.type || "image/png" });
+    shareAsset.file = new File([blob], `vinylpi-on-the-record-${scope}.png`, { type: blob.type || "image/png" });
     shareAsset.url = URL.createObjectURL(blob);
     return shareAsset;
 }
@@ -211,7 +211,9 @@ async function showSharePreview() {
     startShareButtonLoading();
 
     try {
-        const asset = await fetchShareAsset();
+        // Snapshot the active tab before the request; never silently export Vinyl.
+        const scope = typeof vinylPiStatsScope === "string" ? vinylPiStatsScope : "vinyl";
+        const asset = await fetchShareAsset(scope);
         const image = document.getElementById("stats-share-image");
         if (image) {
             image.src = asset.url;
@@ -244,7 +246,7 @@ function downloadShareImage() {
 
     const link = document.createElement("a");
     link.href = shareAsset.url;
-    link.download = "vinylpi-wrapped.png";
+    link.download = shareAsset.file?.name || "vinylpi-on-the-record.png";
     document.body.appendChild(link);
     link.click();
     link.remove();

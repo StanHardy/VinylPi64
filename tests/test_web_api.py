@@ -229,7 +229,25 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, "image/png")
         self.assertEqual(response.data, b"png-bytes")
-        build_share_card_image_mock.assert_called_once_with()
+        build_share_card_image_mock.assert_called_once_with(scope="vinyl")
+
+    @patch("vinylpi.web.routes.stats_api.build_share_card_image", return_value=b"spotify-image")
+    def test_stats_share_card_supports_spotify_scope(self, build_mock):
+        response = self.client.get("/api/stats/share-card?scope=spotify")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("spotify", response.headers["Content-Disposition"])
+        build_mock.assert_called_once_with(scope="spotify")
+
+    @patch("vinylpi.web.routes.stats_api.build_share_card_image", return_value=b"combined-image")
+    def test_stats_share_card_supports_combined_scope(self, build_mock):
+        response = self.client.get("/api/stats/share-card?scope=combined")
+        self.assertEqual(response.status_code, 200)
+        build_mock.assert_called_once_with(scope="combined")
+
+    def test_stats_share_card_rejects_invalid_scope(self):
+        response = self.client.get("/api/stats/share-card?scope=invalid")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "invalid_scope")
 
     @patch("vinylpi.web.routes.profiles_api.select_idle_profile")
     @patch("vinylpi.web.routes.profiles_api.create_profile")

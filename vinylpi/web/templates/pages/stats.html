@@ -25,6 +25,7 @@
         {% include "components/profile_control.html" %}
     </header>
 
+    <div class="stats-content-layout">
     <section class="stats-summary-row">
         <div class="stats-minutes-card page-intro-copy">
             <span class="eyebrow" id="stats-overview-label">Vinyl listening overview</span>
@@ -40,27 +41,6 @@
             </div>
             <p id="stats-share-feedback" class="stats-share-feedback" role="status" aria-live="polite"></p>
         </div>
-
-        <aside id="stats-share-panel" class="stats-share-panel card">
-            <div class="stats-share-panel-copy">
-                <span class="eyebrow">Share</span>
-                <h2>Vinyl Wrapped</h2>
-                <p>Generate a shareable vinyl statistics card.</p>
-            </div>
-            <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Create share preview">
-                <span class="stats-share-button-face">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M12 16V4"></path>
-                        <path d="M7 9l5-5 5 5"></path>
-                        <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
-                    </svg>
-                    <span id="stats-share-button-label">Share</span>
-                </span>
-                <span class="stats-share-button-progress" aria-hidden="true">
-                    <span id="stats-share-button-progress-fill" class="stats-share-button-progress-fill"></span>
-                </span>
-            </button>
-        </aside>
     </section>
 
     <section class="stats-section" aria-live="polite">
@@ -86,6 +66,28 @@
             </article>
         </div>
     </section>
+
+        <aside id="stats-share-panel" class="stats-share-panel card">
+            <div class="stats-share-panel-copy">
+                <span class="eyebrow">Share</span>
+                <h2>On the Record</h2>
+                <p id="stats-share-description">Turn your listening stats into a shareable card.</p>
+            </div>
+            <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Create share preview">
+                <span class="stats-share-button-face">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M12 16V4"></path>
+                        <path d="M7 9l5-5 5 5"></path>
+                        <path d="M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"></path>
+                    </svg>
+                    <span id="stats-share-button-label">Share</span>
+                </span>
+                <span class="stats-share-button-progress" aria-hidden="true">
+                    <span id="stats-share-button-progress-fill" class="stats-share-button-progress-fill"></span>
+                </span>
+            </button>
+        </aside>
+    </div>
 </main>
 
 <div id="stats-share-modal" class="stats-share-modal hidden" aria-hidden="true">
@@ -94,13 +96,13 @@
         <div class="stats-share-dialog-header">
             <div>
                 <span class="eyebrow">Share preview</span>
-                <h2 id="stats-share-title">Vinyl Wrapped</h2>
+                <h2 id="stats-share-title">On the Record</h2>
             </div>
             <button id="stats-share-close" class="stats-share-close" type="button" aria-label="Close share dialog">×</button>
         </div>
 
         <div class="stats-share-preview-wrap">
-            <img id="stats-share-image" class="stats-share-image" alt="Preview of the VinylPi share card">
+            <img id="stats-share-image" class="stats-share-image" alt="Preview of your On the Record listening statistics">
         </div>
 
         <div class="stats-share-action-row">

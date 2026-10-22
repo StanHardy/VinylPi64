@@ -37,8 +37,10 @@ function updateStatsScopeUI() {
     if (overview) overview.textContent = copy.label || "Listening overview";
     if (description) description.textContent = copy.description || "";
 
-    const sharePanel = document.getElementById("stats-share-panel");
-    if (sharePanel) sharePanel.classList.toggle("hidden", vinylPiStatsScope !== "vinyl");
+    const shareDescription = document.getElementById("stats-share-description");
+    if (shareDescription) {
+        shareDescription.textContent = `Create a shareable ${vinylPiStatsScope} listening card.`;
+    }
 
     const pickupUsageRow = document.getElementById("stats-pickup-usage-row");
     if (pickupUsageRow) pickupUsageRow.classList.toggle("hidden", vinylPiStatsScope !== "vinyl");
