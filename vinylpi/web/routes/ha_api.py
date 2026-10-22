@@ -7,7 +7,7 @@ from flask import Blueprint, abort, jsonify, request
 
 from vinylpi.web.services import pixoo, recognizer
 from vinylpi.core.display import show_fallback_image
-from vinylpi.integrations.home_assistant import send_recognition_stopped
+from vinylpi.integrations.pixoo_automations import on_recognition_stopped
 
 bp = Blueprint("ha_api", __name__, url_prefix="/api/ha")
 
@@ -32,7 +32,7 @@ def music_mode_off():
     stopped = recognizer.stop()
     if stopped:
         show_fallback_image()
-        send_recognition_stopped(source="vinyl", reason="manual")
+        on_recognition_stopped(source="vinyl", reason="manual")
     return jsonify({"ok": True, "stopped": stopped})
 
 

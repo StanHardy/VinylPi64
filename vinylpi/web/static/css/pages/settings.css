@@ -2269,3 +2269,15 @@ body.mobile-display-preview-open {
 
 /* Keep the sampling settings visually separate from the adaptive stages. */
 .audio-sample-rate-row { margin-top: 12px; }
+
+/* Shared Pixoo GIF picker, independent of the HA configuration. */
+.pixoo-automation-gif-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.pixoo-automation-gif-picker select { flex: 1 1 170px; min-width: 0; }
+.pixoo-automation-gif-picker button { flex: 0 0 auto; }
+#pixooStopGifStatus { margin: 6px 0 0; }

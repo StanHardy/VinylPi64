@@ -15,7 +15,7 @@ class VinylStartDispatchTests(unittest.TestCase):
     def tearDown(self):
         recognizer._recognizer_proc = self.original_proc
 
-    @patch("vinylpi.web.services.recognizer.send_vinyl_started")
+    @patch("vinylpi.web.services.recognizer.on_vinyl_started")
     @patch("vinylpi.web.services.recognizer.subprocess.Popen")
     def test_manual_start_notifies_once(self, popen, send):
         popen.return_value.poll.return_value = None
@@ -25,7 +25,7 @@ class VinylStartDispatchTests(unittest.TestCase):
         send.assert_called_once_with(reason="manual")
         popen.assert_called_once()
 
-    @patch("vinylpi.web.services.recognizer.send_vinyl_started")
+    @patch("vinylpi.web.services.recognizer.on_vinyl_started")
     @patch("vinylpi.web.services.recognizer.subprocess.Popen")
     def test_auto_wake_start_notifies_once(self, popen, send):
         popen.return_value.poll.return_value = None
@@ -33,16 +33,16 @@ class VinylStartDispatchTests(unittest.TestCase):
         send.assert_called_once_with(reason="auto_wake")
         self.assertEqual(popen.call_args.kwargs["env"]["VINYLPI_START_ORIGIN"], "auto_wake")
 
-    @patch("vinylpi.web.services.recognizer.send_vinyl_started")
+    @patch("vinylpi.web.services.recognizer.on_vinyl_started")
     @patch("vinylpi.web.services.recognizer.subprocess.Popen", side_effect=OSError("bad spawn"))
     def test_failed_spawn_does_not_notify(self, popen, send):
         with self.assertRaises(OSError):
             recognizer.start(silence_output=True)
         send.assert_not_called()
 
-    @patch("vinylpi.web.services.recognizer.send_vinyl_started", return_value=False)
+    @patch("vinylpi.web.services.recognizer.on_vinyl_started", return_value=False)
     @patch("vinylpi.web.services.recognizer.subprocess.Popen")
-    def test_unreachable_ha_does_not_block_start(self, popen, send):
+    def test_offline_pixoo_does_not_block_start(self, popen, send):
         popen.return_value.poll.return_value = None
         self.assertTrue(recognizer.start(silence_output=True))
         send.assert_called_once_with(reason="manual")

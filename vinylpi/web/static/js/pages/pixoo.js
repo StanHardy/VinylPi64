@@ -99,7 +99,22 @@ document.addEventListener("DOMContentLoaded", () => {
                 `Found ${dev.device_name || "Pixoo"} at ${ip} (DeviceId ${id}) and saved to config.`;
 
             if (typeof loadPixooStatus === "function") {
-                loadPixooStatus();
+                likesSelect?.addEventListener("change", async () => {
+        try {
+            const response = await fetch("/api/pixoo/selected-gif", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ file_id: likesSelect.value }),
+            });
+            if (!response.ok) throw new Error("Save failed");
+            likesStatus.textContent = "Selected GIF saved for the current VinylPi profile.";
+        } catch (error) {
+            console.error(error);
+            likesStatus.textContent = "Could not save GIF selection.";
+        }
+    });
+
+    loadPixooStatus();
+    loadLikedGifs();
             }
         } catch (err) {
             console.error("Error during discovery:", err);
@@ -171,14 +186,14 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 
-    async function loadLikedGifs() {
+    async function loadLikedGifs(refresh = false) {
         if (!likesStatus || !likesSelect) return;
 
         likesStatus.textContent = "Loading liked GIFs...";
         likesSelect.innerHTML = `<option value="">Loading…</option>`;
 
         try {
-            const res = await fetch("/api/pixoo/liked-gifs");
+            const res = await fetch(`/api/pixoo/liked-gifs${refresh ? "?refresh=1" : ""}`);
             const data = await res.json();
 
             if (!data.ok) {
@@ -188,9 +203,11 @@ document.addEventListener("DOMContentLoaded", () => {
             const gifs = data.gifs || [];
 
             if (gifs.length === 0) {
-                likesSelect.innerHTML =
-                    `<option value="">No liked GIFs found</option>`;
-                likesStatus.textContent = "No liked GIFs found.";
+                likesSelect.replaceChildren(new Option("No liked GIFs found", ""));
+                const remembered = String(data.selected_file_id || "");
+                if (remembered) likesSelect.add(new Option(`Saved GIF (${remembered})`, remembered));
+                likesSelect.value = remembered;
+                likesStatus.textContent = "No liked GIFs found in the catalog.";
                 return;
             }
 
@@ -202,12 +219,15 @@ document.addEventListener("DOMContentLoaded", () => {
                 likesSelect.appendChild(opt);
             });
 
-            likesStatus.textContent = `Loaded ${gifs.length} GIF(s).`;
+            const remembered = String(data.selected_file_id || "");
+            if (remembered && Array.from(likesSelect.options).some(o => o.value === remembered)) {
+                likesSelect.value = remembered;
+            }
+            likesStatus.textContent = `${gifs.length} liked GIF(s) ${data.cached ? "from cache" : "loaded"}.`;
         } catch (err) {
             console.error("Error loading liked GIFs:", err);
-            likesSelect.innerHTML =
-                `<option value="">Error loading liked GIFs</option>`;
-            likesStatus.textContent = "Error loading liked GIFs.";
+            likesSelect.replaceChildren(new Option("Could not load liked GIFs", ""));
+            likesStatus.textContent = "Could not load liked GIFs. Try refreshing.";
         }
     }
 
@@ -279,7 +299,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (fetchLikesBtn) {
         fetchLikesBtn.addEventListener("click", () => {
-            loadLikedGifs();
+            loadLikedGifs(true);
         });
     }
 
@@ -289,5 +309,20 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     }
 
+    likesSelect?.addEventListener("change", async () => {
+        try {
+            const response = await fetch("/api/pixoo/selected-gif", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ file_id: likesSelect.value }),
+            });
+            if (!response.ok) throw new Error("Save failed");
+            likesStatus.textContent = "Selected GIF saved for the current VinylPi profile.";
+        } catch (error) {
+            console.error(error);
+            likesStatus.textContent = "Could not save GIF selection.";
+        }
+    });
+
     loadPixooStatus();
+    loadLikedGifs();
 });

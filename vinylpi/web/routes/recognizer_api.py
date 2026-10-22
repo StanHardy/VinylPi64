@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify
 from vinylpi.web.services.recognizer import is_running, start, stop
 from vinylpi.web.services.config import read_config
 from vinylpi.core.display import show_fallback_image
-from vinylpi.integrations.home_assistant import send_recognition_stopped
+from vinylpi.integrations.pixoo_automations import on_recognition_stopped
 
 recognizer_bp = Blueprint("recognizer_api", __name__)
 
@@ -22,5 +22,5 @@ def api_recognizer_stop():
     stopped = stop()
     if stopped:
         show_fallback_image()
-        send_recognition_stopped(source="vinyl", reason="manual")
+        on_recognition_stopped(source="vinyl", reason="manual")
     return jsonify({"ok": True, "stopped": stopped, "running": is_running()})

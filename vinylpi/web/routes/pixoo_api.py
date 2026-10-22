@@ -48,10 +48,21 @@ def api_pixoo_channel():
 @pixoo_bp.get("/api/pixoo/liked-gifs")
 def api_pixoo_liked_gifs():
     try:
-        gifs = pixoo.get_liked_gifs(page=1)
-        return jsonify({"ok": True, "gifs": gifs})
+        refresh = request.args.get("refresh", "").lower() in {"1", "true", "yes"}
+        gifs, cached = pixoo.get_liked_gifs(page=1, refresh=refresh)
+        return jsonify({"ok": True, "gifs": gifs, "cached": cached,
+                        "selected_file_id": pixoo.get_selected_stop_gif()})
     except PixooError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@pixoo_bp.post("/api/pixoo/selected-gif")
+def api_selected_stop_gif():
+    data = request.get_json(silent=True) or {}
+    file_id = data.get("file_id")
+    if not isinstance(file_id, str):
+        return jsonify({"ok": False, "error": "file_id must be a string"}), 400
+    pixoo.set_selected_stop_gif(file_id)
+    return jsonify({"ok": True, "selected_file_id": file_id.strip()})
 
 @pixoo_bp.post("/api/pixoo/play-remote")
 def api_pixoo_play_remote():

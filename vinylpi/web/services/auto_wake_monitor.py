@@ -181,8 +181,8 @@ def _run() -> None:
                 _debug(
                     f"Auto-wake switching dashboard to Vinyl at {event.level_dbfs:.1f} dBFS."
                 )
-                # The recognizer service sends the same Pixoo-on webhook for
-                # *every* successful Vinyl start, manual or automatic.
+                # The recognizer service handles the optional local Pixoo-on action
+                # for *every* successful Vinyl start, manual or automatic.
                 source.set_mode("vinyl", _from_auto_wake=True)
                 previous_mode = "vinyl"
                 require_rearm = True

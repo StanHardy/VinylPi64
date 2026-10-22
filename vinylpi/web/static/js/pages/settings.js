@@ -1026,6 +1026,59 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+async function loadPixooAutomationGifs(selectedId = "", refresh = false) {
+    const select = document.getElementById("pixooStopGifSelect");
+    const status = document.getElementById("pixooStopGifStatus");
+    if (!select) return;
+    select.replaceChildren(new Option("Loading liked GIFs…", ""));
+    if (status) status.textContent = "Loading liked GIFs…";
+    try {
+        const response = await fetch(`/api/pixoo/liked-gifs${refresh ? "?refresh=1" : ""}`);
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || "Could not load GIFs");
+        select.replaceChildren(new Option("No GIF selected", ""));
+        for (const gif of (data.gifs || [])) {
+            if (gif.file_id != null) select.add(new Option(gif.file_name || String(gif.file_id), String(gif.file_id)));
+        }
+        // Preserve the configured selection even when that Divoom like disappeared.
+        if (selectedId && !Array.from(select.options).some(o => o.value === selectedId)) {
+            select.add(new Option(`Saved GIF (${selectedId})`, selectedId));
+        }
+        select.value = selectedId;
+        if (status) status.textContent = `${(data.gifs || []).length} liked GIF(s) ${data.cached ? "from cache" : "loaded"}. Selection is saved automatically.`;
+    } catch (error) {
+        select.replaceChildren(new Option("No GIF selected", ""));
+        if (selectedId) select.add(new Option(`Saved GIF (${selectedId})`, selectedId));
+        select.value = selectedId;
+        if (status) status.textContent = "Could not load GIFs. Saved selection is still available.";
+    }
+}
+
+// A GIF choice is persisted immediately, independently of the full Settings Save button.
+document.getElementById("pixooStopGifSelect")?.addEventListener("change", async (event) => {
+    const fileId = event.target.value;
+    const status = document.getElementById("pixooStopGifStatus");
+    try {
+        const res = await fetch("/api/pixoo/selected-gif", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ file_id: fileId }),
+        });
+        if (!res.ok) throw new Error("Failed saving selected GIF");
+        if (CURRENT_CFG) {
+            CURRENT_CFG.pixoo_automations = CURRENT_CFG.pixoo_automations || {};
+            CURRENT_CFG.pixoo_automations.stop_gif_file_id = fileId;
+        }
+        if (status) status.textContent = fileId ? "GIF selection saved." : "GIF selection cleared.";
+    } catch (error) {
+        console.error(error);
+        if (status) status.textContent = "Could not save GIF selection.";
+    }
+});
+
+document.getElementById("pixooRefreshLikes")?.addEventListener("click", () => {
+    loadPixooAutomationGifs(document.getElementById("pixooStopGifSelect")?.value || "", true);
+});
+
 async function loadConfig() {
     const r = await fetch("/api/config");
     const cfg = await r.json();
@@ -1042,6 +1095,7 @@ async function loadConfig() {
     const spotify = cfg.spotify || {};
     const discogs = cfg.discogs || {};
     const homeassistant = cfg.homeassistant || {};
+    const pixooAutomations = cfg.pixoo_automations || {};
 
     // AUDIO
     await loadAudioDevices(audio.device_name_contains || "");
@@ -1198,6 +1252,11 @@ async function loadConfig() {
     document.getElementById("debugWavEnabled").checked =
         !!debug.wav_path;
 
+    // PIXOO AUTOMATIONS: source-independent, per-profile settings.
+    document.getElementById("pixooOnVinylStart").checked = !!pixooAutomations.turn_on_on_vinyl_start;
+    document.getElementById("pixooPlayGifOnStop").checked = !!pixooAutomations.play_gif_on_stop;
+    loadPixooAutomationGifs(String(pixooAutomations.stop_gif_file_id || ""));
+
     // HOME ASSISTANT
     document.getElementById("useHA").checked =
         !!homeassistant.use_ha;
@@ -1205,10 +1264,6 @@ async function loadConfig() {
         homeassistant.base_url || "";
     document.getElementById("webHookID").value =
         homeassistant.webhook_id || "";
-    document.getElementById("haStopWebhookID").value =
-        homeassistant.stop_webhook_id || "";
-    document.getElementById("haWakeWebhookID").value =
-        homeassistant.wake_webhook_id || "";
 
     syncDependentSettingStates();
 }
@@ -1232,6 +1287,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     cfg.spotify = cfg.spotify || {};
     cfg.discogs = cfg.discogs || {};
     cfg.homeassistant = cfg.homeassistant || {};
+    cfg.pixoo_automations = cfg.pixoo_automations || {};
 
     const audio = cfg.audio;
     const adaptiveSample = cfg.audio.adaptive_sample;
@@ -1246,6 +1302,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     const spotify = cfg.spotify;
     const discogs = cfg.discogs;
     const homeassistant = cfg.homeassistant;
+    const pixooAutomations = cfg.pixoo_automations;
 
     // AUDIO
     audio.device_name_contains =
@@ -1424,6 +1481,15 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     debug.wav_path = document.getElementById("debugWavEnabled").checked
         ? "data/debug/recording.wav" : "";
 
+    // PIXOO AUTOMATIONS (no Home Assistant dependency)
+    pixooAutomations.turn_on_on_vinyl_start = document.getElementById("pixooOnVinylStart").checked;
+    pixooAutomations.play_gif_on_stop = document.getElementById("pixooPlayGifOnStop").checked;
+    pixooAutomations.stop_gif_file_id = document.getElementById("pixooStopGifSelect").value.trim();
+    // Remove unused Pixoo-via-HA fields from the next config save.
+    for (const key of ["stop_webhook_id", "wake_webhook_id", "replay_on_stop_enabled", "wake_webhook_enabled"]) {
+        delete homeassistant[key];
+    }
+
     // HOME ASSISTANT
     homeassistant.use_ha =
         document.getElementById("useHA").checked;
@@ -1431,14 +1497,6 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         document.getElementById("baseURL").value;
     homeassistant.webhook_id =
         document.getElementById("webHookID").value;
-    // Retired the separate stop-toggle: the HA master switch now controls both hooks.
-    delete homeassistant.replay_on_stop_enabled;
-    homeassistant.stop_webhook_id =
-        document.getElementById("haStopWebhookID").value.trim();
-    // Legacy wake_webhook_enabled may still exist in old config files; it is ignored.
-    delete homeassistant.wake_webhook_enabled;
-    homeassistant.wake_webhook_id =
-        document.getElementById("haWakeWebhookID").value.trim();
 
     try {
         const response = await fetch("/api/config", {

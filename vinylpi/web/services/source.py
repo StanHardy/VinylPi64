@@ -5,7 +5,7 @@ from vinylpi.config.runtime import read_config
 from vinylpi.core.display import show_fallback_image
 from vinylpi.core.stats_db import get_current_status
 from vinylpi.core.status import get_last_source_status
-from vinylpi.integrations.home_assistant import send_recognition_stopped
+from vinylpi.integrations.pixoo_automations import on_recognition_stopped
 from vinylpi.integrations.spotify_client import (
     SpotifyClient,
     SpotifyError,
@@ -185,7 +185,7 @@ def set_mode(mode: str, *, _from_auto_wake: bool = False) -> dict:
             # Only notify on an actual active -> Off transition. Repeated Off
             # clicks still refresh the fallback, but do not replay the GIF.
             if current_mode != "off":
-                send_recognition_stopped(source=current_mode, reason="manual")
+                on_recognition_stopped(source=current_mode, reason="manual")
             # Keep the selected profile as the owner of the lightweight idle
             # monitor. This preserves its wake threshold and ensures an
             # automatic Vinyl start writes statistics to the same profile.

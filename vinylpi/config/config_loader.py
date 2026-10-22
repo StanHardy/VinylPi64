@@ -104,15 +104,16 @@ CONFIG_DEFAULTS = {
         "vinyl_audio_sleep_confirm_seconds": 30.0,
         "stats_min_consecutive": 3
     },
+    "pixoo_automations": {
+        "turn_on_on_vinyl_start": False,
+        "play_gif_on_stop": False,
+        "stop_gif_file_id": ""
+    },
     "homeassistant": {
         "use_ha": True,
         "base_url": "",
         "webhook_id": "vinylpi_cover_color",
-        # Dedicated Off-event webhook; an empty ID disables only this event.
-        "stop_webhook_id": "",
-        # Optional Pixoo-on notification when Vinyl recognition starts.
-        # An empty ID disables the notification (no additional switch).
-        "wake_webhook_id": ""
+        # Pixoo actions are handled locally; HA is used only for color sync.
     }
 }
 
@@ -184,10 +185,11 @@ def load_config(path: Path | str | None = None) -> dict:
     if isinstance(discogs, dict):
         discogs.pop("token", None)
 
-    # The two HA webhooks now share the master switch; retire the old stop toggle.
+    # Remove superseded Pixoo-via-HA settings from older profile configs.
     homeassistant = cfg.get("homeassistant")
     if isinstance(homeassistant, dict):
-        homeassistant.pop("replay_on_stop_enabled", None)
+        for old_key in ("replay_on_stop_enabled", "stop_webhook_id", "wake_webhook_id", "wake_webhook_enabled"):
+            homeassistant.pop(old_key, None)
 
     # Older builds used a time-based repeat guard. Statistics are now strictly
     # transition-based, so keeping this legacy value would be misleading.

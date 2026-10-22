@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/pixoo.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/pixoo.js') }}?v=20261022-pixoo-auto" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -88,9 +88,9 @@
                         <h2>Liked GIFs</h2>
                     </div>
                 </div>
-                <p class="pixoo-help">Load your liked Divoom community GIFs and play one on the Pixoo.</p>
+                <p class="pixoo-help">Your liked Divoom GIFs are loaded automatically and cached on VinylPi.</p>
                 <div class="pixoo-inline-action">
-                    <button id="pixooFetchLikesBtn" class="btn-primary">Load liked GIFs</button>
+                    <button id="pixooFetchLikesBtn" class="btn-primary">Refresh liked GIFs</button>
                     <span id="pixooLikesStatus" class="pixoo-reboot-status"></span>
                 </div>
                 <div class="pixoo-row pixoo-row-select">

@@ -3,110 +3,50 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import requests
-
-from vinylpi.integrations.home_assistant import send_recognition_stopped, send_vinyl_started
+from vinylpi.integrations.pixoo_automations import on_recognition_stopped, on_vinyl_started
 from vinylpi.web.services import source
 
 
-class StopWebhookTests(unittest.TestCase):
+class PixooDirectActionTests(unittest.TestCase):
     def setUp(self):
-        self.cfg = {
-            "homeassistant": {
-                "use_ha": True,
-                "base_url": "http://homeassistant:8123/",
-                "webhook_id": "rgb-webhook",
-                "stop_webhook_id": "stop-only-webhook",
-            }
-        }
+        self.cfg = {"pixoo_automations": {"turn_on_on_vinyl_start": True,
+                                          "play_gif_on_stop": True,
+                                          "stop_gif_file_id": "4321"},
+                    "divoom": {"ip": "192.0.2.25", "timeout": 1},
+                    "homeassistant": {"use_ha": False}}
 
-    @patch("vinylpi.integrations.home_assistant._session.post")
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_stop_uses_dedicated_webhook_not_rgb(self, read_config, post):
-        read_config.return_value = self.cfg
-        self.assertTrue(send_recognition_stopped(source="spotify", reason="auto_sleep"))
-        post.assert_called_once_with(
-            "http://homeassistant:8123/api/webhook/stop-only-webhook",
-            json={"event": "recognition_stopped", "source": "spotify", "reason": "auto_sleep"},
-            timeout=2,
-        )
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_start_is_independent_of_ha(self, config, client):
+        config.return_value = self.cfg
+        self.assertTrue(on_vinyl_started(reason="auto_wake"))
+        client.return_value.set_brightness.assert_called_once_with(100)
 
-    @patch("vinylpi.integrations.home_assistant._session.post")
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_disabled_does_not_send(self, read_config, post):
-        self.cfg["homeassistant"]["use_ha"] = False
-        read_config.return_value = self.cfg
-        self.assertFalse(send_recognition_stopped(source="vinyl", reason="manual"))
-        post.assert_not_called()
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_stop_plays_selected_gif(self, config, client):
+        config.return_value = self.cfg
+        self.assertTrue(on_recognition_stopped(source="spotify", reason="auto_sleep"))
+        client.return_value.play_remote_gif.assert_called_once_with("4321")
 
-    @patch("vinylpi.integrations.home_assistant._session.post")
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_missing_webhook_does_not_send(self, read_config, post):
-        self.cfg["homeassistant"]["stop_webhook_id"] = ""
-        read_config.return_value = self.cfg
-        self.assertFalse(send_recognition_stopped(source="vinyl", reason="manual"))
-        post.assert_not_called()
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_disabled_and_missing_selection_do_not_send(self, config, client):
+        config.return_value = self.cfg
+        self.cfg["pixoo_automations"]["turn_on_on_vinyl_start"] = False
+        self.cfg["pixoo_automations"]["stop_gif_file_id"] = ""
+        self.assertFalse(on_vinyl_started())
+        self.assertFalse(on_recognition_stopped(source="vinyl", reason="manual"))
+        client.assert_not_called()
 
-    @patch("vinylpi.integrations.home_assistant._session.post", side_effect=requests.Timeout("offline"))
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_offline_ha_never_crashes_stop(self, read_config, post):
-        read_config.return_value = self.cfg
-        self.assertFalse(send_recognition_stopped(source="vinyl", reason="manual"))
-        post.assert_called_once()
-
-
-class VinylStartWebhookTests(unittest.TestCase):
-    def setUp(self):
-        self.cfg = {"homeassistant": {
-            "use_ha": True,
-            "base_url": "http://homeassistant:8123/",
-            "webhook_id": "rgb-only",
-            "stop_webhook_id": "off-only",
-            "wake_webhook_id": "on-only",
-        }}
-
-    @patch("vinylpi.integrations.home_assistant._session.post")
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_vinyl_start_uses_dedicated_pixoo_on_webhook(self, read_config, post):
-        read_config.return_value = self.cfg
-        for reason in ("manual", "auto_wake"):
-            with self.subTest(reason=reason):
-                post.reset_mock()
-                self.assertTrue(send_vinyl_started(reason=reason))
-                post.assert_called_once_with(
-                    "http://homeassistant:8123/api/webhook/on-only",
-                    json={"event": "vinyl_started", "source": "vinyl", "reason": reason, "action": "pixoo_on"},
-                    timeout=2,
-                )
-
-    @patch("vinylpi.integrations.home_assistant._session.post")
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_id_alone_enables_new_option(self, read_config, post):
-        read_config.return_value = {"homeassistant": {
-            "use_ha": True, "base_url": "http://homeassistant:8123", "wake_webhook_id": "on-only"
-        }}
-        self.assertTrue(send_vinyl_started(reason="manual"))
-        post.assert_called_once()
-
-    @patch("vinylpi.integrations.home_assistant._session.post")
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_missing_webhook_or_master_switch_prevents_notification(self, read_config, post):
-        read_config.return_value = self.cfg
-        self.cfg["homeassistant"]["use_ha"] = False
-        self.assertFalse(send_vinyl_started(reason="manual"))
-        self.cfg["homeassistant"]["use_ha"] = True
-        self.cfg["homeassistant"]["wake_webhook_id"] = ""
-        self.assertFalse(send_vinyl_started(reason="manual"))
-        post.assert_not_called()
-
-    @patch("vinylpi.integrations.home_assistant._session.post", side_effect=requests.Timeout("HA offline"))
-    @patch("vinylpi.integrations.home_assistant.read_config")
-    def test_ha_offline_does_not_block_vinyl_start(self, read_config, post):
-        read_config.return_value = self.cfg
-        self.assertFalse(send_vinyl_started(reason="manual"))
-        post.assert_called_once()
+    @patch("vinylpi.integrations.pixoo_automations._client", side_effect=OSError("offline"))
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_offline_does_not_break_source_switch(self, config, client):
+        config.return_value = self.cfg
+        self.assertFalse(on_vinyl_started())
+        self.assertFalse(on_recognition_stopped(source="vinyl", reason="manual"))
 
 
 class SourceTransitionTests(unittest.TestCase):
@@ -116,19 +56,19 @@ class SourceTransitionTests(unittest.TestCase):
     @patch("vinylpi.web.services.source.show_fallback_image")
     @patch("vinylpi.web.services.source.recognizer.stop")
     @patch("vinylpi.web.services.source.spotify.stop")
-    @patch("vinylpi.web.services.source.send_recognition_stopped")
+    @patch("vinylpi.web.services.source.on_recognition_stopped")
     @patch("vinylpi.web.services.source.get_runtime_profile", return_value={"storage_key": "user"})
     @patch("vinylpi.web.services.source.get_active_storage_key", return_value="user")
     @patch("vinylpi.web.services.source.get_mode", return_value="vinyl")
-    def test_manual_off_emits_after_fallback(
+    def test_manual_off_plays_gif_after_fallback(
         self, get_mode, viewer, profile, send, spotify_stop, vinyl_stop,
         fallback, set_profile, status, resume,
     ):
         events = []
         fallback.side_effect = lambda: events.append("fallback")
-        send.side_effect = lambda **kw: events.append("webhook")
+        send.side_effect = lambda **kw: events.append("pixoo")
         source.set_mode("off")
-        self.assertEqual(events, ["fallback", "webhook"])
+        self.assertEqual(events, ["fallback", "pixoo"])
         send.assert_called_once_with(source="vinyl", reason="manual")
 
     @patch("vinylpi.web.services.auto_wake_monitor.resume")
@@ -137,11 +77,11 @@ class SourceTransitionTests(unittest.TestCase):
     @patch("vinylpi.web.services.source.show_fallback_image")
     @patch("vinylpi.web.services.source.recognizer.stop")
     @patch("vinylpi.web.services.source.spotify.stop")
-    @patch("vinylpi.web.services.source.send_recognition_stopped")
+    @patch("vinylpi.web.services.source.on_recognition_stopped")
     @patch("vinylpi.web.services.source.get_runtime_profile", return_value={"storage_key": "user"})
     @patch("vinylpi.web.services.source.get_active_storage_key", return_value="user")
     @patch("vinylpi.web.services.source.get_mode", return_value="off")
-    def test_repeated_off_does_not_emit(self, get_mode, viewer, profile, send, spotify_stop, vinyl_stop,
+    def test_repeated_off_does_not_replay(self, get_mode, viewer, profile, send, spotify_stop, vinyl_stop,
                                        fallback, set_profile, status, resume):
         source.set_mode("off")
         fallback.assert_called_once()
@@ -149,7 +89,8 @@ class SourceTransitionTests(unittest.TestCase):
 
 
 class AutomaticStopTests(unittest.TestCase):
-    @patch("vinylpi.core.runner.send_recognition_stopped")
+    @unittest.skipUnless(__import__("importlib").util.find_spec("sounddevice"), "PortAudio/sounddevice unavailable")
+    @patch("vinylpi.core.runner.on_recognition_stopped")
     @patch("vinylpi.core.runner.show_fallback_image")
     @patch("vinylpi.core.runner.flush_timed_listen_if_needed")
     @patch("vinylpi.core.runner.record_sample", return_value=b"audio")
@@ -162,7 +103,7 @@ class AutomaticStopTests(unittest.TestCase):
     @patch("vinylpi.core.runner.LoopConfig.from_config")
     @patch("vinylpi.core.runner.initialize_storage")
     @patch("vinylpi.core.runner.read_config", return_value={"debug": {"logs": False}})
-    def test_vinyl_audio_standby_sends_after_fallback(
+    def test_vinyl_audio_standby_plays_after_fallback(
         self, read_config, storage, loop_cfg, reload, watcher, restore, pickup, audio,
         measure, record, flush, fallback, send,
     ):
@@ -173,12 +114,13 @@ class AutomaticStopTests(unittest.TestCase):
         from vinylpi.core.runner import main_loop
         events = []
         fallback.side_effect = lambda: events.append("fallback")
-        send.side_effect = lambda **kw: events.append("webhook")
+        send.side_effect = lambda **kw: events.append("pixoo")
         main_loop()
-        self.assertEqual(events, ["fallback", "webhook"])
+        self.assertEqual(events, ["fallback", "pixoo"])
         send.assert_called_once_with(source="vinyl", reason="audio_standby")
 
-    @patch("vinylpi.core.runner.send_recognition_stopped")
+    @unittest.skipUnless(__import__("importlib").util.find_spec("sounddevice"), "PortAudio/sounddevice unavailable")
+    @patch("vinylpi.core.runner.on_recognition_stopped")
     @patch("vinylpi.core.runner.handle_no_result", return_value=True)
     @patch("vinylpi.core.runner.get_side_flip_prompt", return_value=None)
     @patch("vinylpi.core.runner.flush_timed_listen_if_needed")
@@ -205,7 +147,7 @@ class AutomaticStopTests(unittest.TestCase):
         main_loop()
         send.assert_called_once_with(source="vinyl", reason="auto_sleep")
 
-    @patch("vinylpi.spotify_worker.send_recognition_stopped")
+    @patch("vinylpi.spotify_worker.on_recognition_stopped")
     @patch("vinylpi.spotify_worker.show_fallback_image")
     @patch("vinylpi.spotify_worker._auto_sleep_settings", return_value=(True, 1))
     @patch("vinylpi.spotify_worker._backfill_missing_genres")
@@ -215,7 +157,7 @@ class AutomaticStopTests(unittest.TestCase):
     @patch("vinylpi.spotify_worker.start_display_refresh_watcher")
     @patch("vinylpi.spotify_worker.load_dotenv")
     @patch("vinylpi.spotify_worker.read_config", return_value={"debug": {"logs": False}})
-    def test_spotify_idle_auto_sleep(self, read_config, load_env, watcher, client, db_path,
+    def test_spotify_idle_auto_sleep_plays_gif(self, read_config, load_env, watcher, client, db_path,
                                       last_status, backfill, auto_settings, fallback, send):
         client.return_value.get_currently_playing.return_value = None
         from vinylpi.spotify_worker import main

@@ -18,3 +18,6 @@ data/profiles.json
 data/profiles/
 
 data/.session_secret
+
+# Locally cached Pixoo community GIF list (device-specific)
+data/pixoo_liked_gifs.json

@@ -17,7 +17,7 @@ class PixooError(Exception):
 
 
 class PixooClient:
-    def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None):
+    def __init__(self, ip: Optional[str] = None, timeout: Optional[float] = None, *, auto_discover: bool = True):
         CONFIG = read_config()
         divoom_cfg = CONFIG.get("divoom", {})
         debug_log = CONFIG["debug"]["logs"]
@@ -29,6 +29,12 @@ class PixooClient:
         cfg_ip = divoom_cfg.get("ip")
 
         candidate_ip = ip or cfg_ip
+        if not auto_discover:
+            # Divoom cloud operations only need device ID/MAC; they must work
+            # even if the Pixoo has no reachable/configured LAN address.
+            self.ip = candidate_ip or ""
+            self.base_url = f"http://{self.ip}/post" if self.ip else ""
+            return
 
         if candidate_ip:
             if _probe_ip(candidate_ip, self.timeout):
@@ -118,6 +124,8 @@ class PixooClient:
 
 
     def _post(self, payload: dict) -> dict:
+        if not self.base_url:
+            raise PixooError("Pixoo IP is not configured for local commands")
         try:
             resp = requests.post(
                 self.base_url,
