@@ -3,13 +3,14 @@
 {% block title %}VinylPi Statistics{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/stats.css') }}?v=20261022-spin">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/pages/stats.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/stats.js') }}?v=20261022-spin" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_stats.js') }}" defer></script>
 {% endblock %}
 
@@ -38,7 +39,8 @@
             <div class="stats-overview-top">
                 <span class="eyebrow" id="stats-overview-label">Vinyl listening overview</span>
                 <button id="stats-mobile-share" class="stats-mobile-share" type="button" aria-label="Share Spin Report" title="Share Spin Report">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4 M7 9l5-5 5 5 M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+                    <svg class="stats-mobile-share-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4 M7 9l5-5 5 5 M5 14v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+                    <span class="vinyl-loader" aria-hidden="true"></span>
                 </button>
             </div>
             <div class="stats-value-row">
@@ -46,6 +48,10 @@
                 <span class="stats-unit">minutes</span>
             </div>
             <div id="stats-description" class="stats-description">Calculated from confirmed vinyl recognitions.</div>
+            <div id="stats-share-loading-status" class="stats-share-loading-status hidden" role="status" aria-live="polite">
+                <span class="vinyl-loader" aria-hidden="true"></span>
+                <span>Preparing Spin Report…</span>
+            </div>
             <div id="stats-pickup-usage-row" class="stats-pickup-usage">
                 <span class="stats-pickup-label">Pickup usage</span>
                 <strong id="stats-pickup-usage">—</strong>

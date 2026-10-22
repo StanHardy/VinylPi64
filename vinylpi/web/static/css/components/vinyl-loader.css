@@ -1,0 +1,34 @@
+/* Reusable CSS-only, lightweight turntable loading indicator. */
+.vinyl-loader {
+    --vinyl-accent: var(--yellow, #f5c542);
+    display: inline-block;
+    position: relative;
+    flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid #373741;
+    background:
+        radial-gradient(circle at center, #15151b 0 6%, #d6d6dc 6% 9%, #191921 9% 11%, var(--vinyl-accent) 11% 27%, #111116 27% 29%, transparent 29%),
+        repeating-radial-gradient(circle at center, #25252f 0 1px, #0c0c11 1.5px 3px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .33);
+    animation: vinyl-loader-spin 1.2s linear infinite;
+}
+
+/* Asymmetric reflected light makes rotation visible despite circular grooves. */
+.vinyl-loader::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: conic-gradient(from 15deg, transparent 0deg, rgba(255, 255, 255, .27) 29deg, transparent 61deg, transparent 170deg, rgba(255,255,255,.12) 199deg, transparent 225deg);
+    pointer-events: none;
+}
+
+@keyframes vinyl-loader-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vinyl-loader { animation: none; }
+}

@@ -3,12 +3,13 @@
 {% block title %}VinylPi Dashboard{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261012-layout2">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261022-spin">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20260925b" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20261022-spin" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}?v=20261008a" defer></script>
     <script src="{{ url_for('static', filename='js/pages/random_record.js') }}?v=20261008b" defer></script>
 {% endblock %}
@@ -124,6 +125,10 @@
                 </div>
 
                 <div class="lyrics-inline hidden" id="lyrics-card">
+                    <div id="lyrics-loading" class="lyrics-loading hidden" role="status" aria-live="polite">
+                        <span class="vinyl-loader" aria-hidden="true"></span>
+                        <span>Looking up lyrics…</span>
+                    </div>
                     <pre id="lyrics-box" class="lyrics-box hidden collapsed"></pre>
                     <button
                         id="btn-lyrics-toggle"

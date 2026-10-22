@@ -26,6 +26,8 @@ function statsScopeCopy(scope) {
 }
 
 function updateStatsScopeUI() {
+    const layout = document.querySelector(".stats-content-layout");
+    if (layout) layout.dataset.statsScope = vinylPiStatsScope;
     document.querySelectorAll("[data-stats-scope]").forEach((button) => {
         const active = button.dataset.statsScope === vinylPiStatsScope;
         button.classList.toggle("active", active);

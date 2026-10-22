@@ -69,6 +69,7 @@ function getTrackKey(track = CURRENT_TRACK) {
 function resetTrackDependentUI() {
     lyricsAbortController?.abort();
     lyricsAbortController = null;
+    setLyricsLoading(false);
 
     trackInfoAbortController?.abort();
     trackInfoAbortController = null;
@@ -598,15 +599,24 @@ function setLyricsToggleState(collapsed) {
     button.title = expanded ? "Collapse lyrics" : "Expand lyrics";
 }
 
+function setLyricsLoading(loading) {
+    document.getElementById("lyrics-loading")?.classList.toggle("hidden", !loading);
+    const lyricsButton = document.getElementById("btn-lyrics");
+    if (lyricsButton) {
+        lyricsButton.disabled = loading;
+        lyricsButton.setAttribute("aria-busy", String(loading));
+    }
+}
+
 async function loadLyrics() {
     const box = document.getElementById("lyrics-box");
     const toggleButton = document.getElementById("btn-lyrics-toggle");
     const card = document.getElementById("lyrics-card");
     if (!box || !toggleButton) return;
 
-    box.classList.remove("hidden");
-    box.classList.add("collapsed");
-    box.textContent = "Loading lyrics…";
+    if (lyricsAbortController) return; // Avoid duplicate Genius requests.
+    box.classList.add("hidden", "collapsed");
+    box.textContent = "";
     toggleButton.classList.add("hidden");
     setLyricsToggleState(true);
     if (card) {
@@ -618,12 +628,13 @@ async function loadLyrics() {
     const requestedTrackKey = getTrackKey();
     if (!artist || !title) {
         box.textContent = "No track information available.";
+        box.classList.remove("hidden");
         return;
     }
 
-    lyricsAbortController?.abort();
     const controller = new AbortController();
     lyricsAbortController = controller;
+    setLyricsLoading(true);
 
     try {
         const response = await fetch(
@@ -632,8 +643,9 @@ async function loadLyrics() {
         );
         const result = await response.json();
 
-        if (requestedTrackKey !== getTrackKey()) return;
+        if (requestedTrackKey !== getTrackKey() || lyricsAbortController !== controller) return;
 
+        box.classList.remove("hidden");
         if (!response.ok || !result.ok || !result.lyrics) {
             box.textContent = "No lyrics found. Opening Genius search…";
             window.open(
@@ -657,9 +669,15 @@ async function loadLyrics() {
     } catch (error) {
         if (error.name === "AbortError") return;
         console.error(error);
-        if (requestedTrackKey === getTrackKey()) box.textContent = "Error loading lyrics.";
+        if (lyricsAbortController === controller && requestedTrackKey === getTrackKey()) {
+            box.classList.remove("hidden");
+            box.textContent = "Error loading lyrics.";
+        }
     } finally {
-        if (lyricsAbortController === controller) lyricsAbortController = null;
+        if (lyricsAbortController === controller) {
+            lyricsAbortController = null;
+            setLyricsLoading(false);
+        }
     }
 }
 

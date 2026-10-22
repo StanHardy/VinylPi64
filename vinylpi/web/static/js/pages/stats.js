@@ -4,6 +4,7 @@ let albumCarouselTimer = null;
 let albumCarouselIndex = 0;
 let shareAsset = { blob: null, file: null, url: null };
 let shareButtonProgressTimer = null;
+let sharePreviewPending = false;
 
 function formatCount(value, singular, plural = `${singular}s`) {
     const count = Number(value) || 0;
@@ -156,23 +157,34 @@ function setShareButtonProgress(value) {
     fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
 }
 
-function startShareButtonLoading() {
-    const button = document.getElementById("stats-share-button") || document.getElementById("stats-mobile-share");
+function setShareLoadingState(loading) {
+    const desktop = document.getElementById("stats-share-button");
+    const mobile = document.getElementById("stats-mobile-share");
     const label = document.getElementById("stats-share-button-label");
-    if (!button || !label) return;
+    const status = document.getElementById("stats-share-loading-status");
 
-    let progress = 4;
-    const mobileButton = document.getElementById('stats-mobile-share');
-    if (mobileButton) mobileButton.disabled = true;
-    button.disabled = true;
-    button.classList.add("is-loading");
-    label.textContent = "Preparing…";
-    setShareButtonProgress(progress);
-
-    if (shareButtonProgressTimer) {
-        clearInterval(shareButtonProgressTimer);
+    if (desktop) {
+        desktop.disabled = loading;
+        desktop.classList.toggle("is-loading", loading);
+        desktop.setAttribute("aria-busy", String(loading));
     }
+    if (mobile) {
+        mobile.disabled = loading;
+        mobile.classList.toggle("is-loading", loading);
+        mobile.setAttribute("aria-busy", String(loading));
+        mobile.setAttribute("aria-label", loading ? "Preparing Spin Report" : "Share Spin Report");
+        mobile.title = loading ? "Preparing Spin Report" : "Share Spin Report";
+    }
+    if (label) label.textContent = loading ? "Preparing…" : "Share";
+    status?.classList.toggle("hidden", !loading);
+}
 
+function startShareButtonLoading() {
+    setShareLoadingState(true);
+    let progress = 4;
+    setShareButtonProgress(progress);
+    if (shareButtonProgressTimer !== null) clearInterval(shareButtonProgressTimer);
+    // The desktop progress bar is indicative, not a reported download percent.
     shareButtonProgressTimer = window.setInterval(() => {
         progress = Math.min(progress + 1.25, 94);
         setShareButtonProgress(progress);
@@ -180,26 +192,16 @@ function startShareButtonLoading() {
 }
 
 function stopShareButtonLoading(success) {
-    const button = document.getElementById("stats-share-button");
-    const label = document.getElementById("stats-share-button-label");
-    if (!button || !label) return;
-
-    if (shareButtonProgressTimer) {
+    if (shareButtonProgressTimer !== null) {
         clearInterval(shareButtonProgressTimer);
         shareButtonProgressTimer = null;
     }
-
-    if (success) {
-        setShareButtonProgress(100);
-    }
-
+    if (success) setShareButtonProgress(100);
+    // Leave the completed desktop progress bar visible for a brief moment.
     window.setTimeout(() => {
-        button.disabled = false;
-        const mobileButton = document.getElementById('stats-mobile-share');
-        if (mobileButton) mobileButton.disabled = false;
-        button.classList.remove("is-loading");
-        label.textContent = "Share";
+        setShareLoadingState(false);
         setShareButtonProgress(0);
+        sharePreviewPending = false;
     }, success ? 180 : 0);
 }
 
@@ -210,6 +212,8 @@ function updateShareCapabilities() {
 }
 
 async function showSharePreview() {
+    if (sharePreviewPending) return;
+    sharePreviewPending = true;
     setFeedback("stats-share-feedback", "", "");
     setFeedback("stats-share-modal-feedback", "", "");
     startShareButtonLoading();

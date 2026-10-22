@@ -540,12 +540,47 @@ body.stats-share-open {
 .stats-year-picker { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; }
 .stats-year-picker select { background:var(--card-bg, #191921); color:var(--text); border:1px solid var(--border); border-radius:9px; padding:9px 12px; font:inherit; color-scheme:dark; }
 .stats-overview-top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.stats-mobile-share { display:none; width:42px; height:42px; flex:0 0 42px; align-items:center; justify-content:center; padding:9px; border:1px solid var(--border); border-radius:12px; color:var(--text); background:rgba(255,255,255,.06); cursor:pointer; }
+/* Mobile share control uses the current source's accent color. */
+.stats-content-layout { --vinyl-accent: var(--yellow); }
+.stats-content-layout[data-stats-scope="spotify"] { --vinyl-accent: #1ed760; }
+.stats-content-layout[data-stats-scope="combined"] { --vinyl-accent: #af7bff; }
+.stats-mobile-share {
+    display: none;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    align-items: center;
+    justify-content: center;
+    padding: 9px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--vinyl-accent);
+    background: rgba(255,255,255,.06);
+    cursor: pointer;
+    transition: background 150ms ease, border-color 150ms ease;
+}
+.stats-mobile-share:hover { background: rgba(255,255,255,.09); border-color: currentColor; }
+.stats-mobile-share:focus-visible { outline: 2px solid var(--vinyl-accent); outline-offset: 3px; }
 .stats-mobile-share svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+.stats-mobile-share .vinyl-loader { display: none; width: 24px; height: 24px; }
+.stats-mobile-share.is-loading .stats-mobile-share-icon { display: none; }
+.stats-mobile-share.is-loading .vinyl-loader { display: inline-block; }
+.stats-mobile-share:disabled { cursor: wait; opacity: 1; }
+.stats-share-loading-status {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 14px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--vinyl-accent);
+}
+.stats-share-loading-status .vinyl-loader { width: 26px; height: 26px; }
 @media (max-width:980px) {
     .stats-share-panel { display:none; }
     .stats-content-layout { grid-template-areas:"overview" "statistics"; }
     .stats-mobile-share { display:inline-flex; }
+    .stats-share-loading-status:not(.hidden) { display:flex; }
 }
 @media (max-width:650px) {
     .stats-header-with-scope .stats-year-picker { order:3; }
