@@ -3,7 +3,6 @@ let radarChart = null;
 let albumCarouselTimer = null;
 let albumCarouselIndex = 0;
 let shareAsset = { blob: null, file: null, url: null };
-let shareButtonProgressTimer = null;
 let sharePreviewPending = false;
 
 function formatCount(value, singular, plural = `${singular}s`) {
@@ -151,12 +150,6 @@ function canNativeShareFile() {
     );
 }
 
-function setShareButtonProgress(value) {
-    const fill = document.getElementById("stats-share-button-progress-fill");
-    if (!fill) return;
-    fill.style.width = `${Math.max(0, Math.min(100, value))}%`;
-}
-
 function setShareLoadingState(loading) {
     const desktop = document.getElementById("stats-share-button");
     const mobile = document.getElementById("stats-mobile-share");
@@ -181,26 +174,11 @@ function setShareLoadingState(loading) {
 
 function startShareButtonLoading() {
     setShareLoadingState(true);
-    let progress = 4;
-    setShareButtonProgress(progress);
-    if (shareButtonProgressTimer !== null) clearInterval(shareButtonProgressTimer);
-    // The desktop progress bar is indicative, not a reported download percent.
-    shareButtonProgressTimer = window.setInterval(() => {
-        progress = Math.min(progress + 1.25, 94);
-        setShareButtonProgress(progress);
-    }, 120);
 }
 
 function stopShareButtonLoading(success) {
-    if (shareButtonProgressTimer !== null) {
-        clearInterval(shareButtonProgressTimer);
-        shareButtonProgressTimer = null;
-    }
-    if (success) setShareButtonProgress(100);
-    // Leave the completed desktop progress bar visible for a brief moment.
     window.setTimeout(() => {
         setShareLoadingState(false);
-        setShareButtonProgress(0);
         sharePreviewPending = false;
     }, success ? 180 : 0);
 }

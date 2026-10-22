@@ -13,6 +13,7 @@
 .stats-summary-row {
     grid-area: overview;
     min-width: 0;
+    display: flex;
 }
 
 .stats-share-panel {
@@ -21,8 +22,14 @@
     flex-direction: column;
     justify-content: space-between;
     gap: 18px;
+    height: 100%;
     margin: 0;
+    margin-bottom: 0;
     padding: 22px;
+}
+
+.stats-share-panel-copy {
+    flex: 1 1 auto;
 }
 
 .stats-share-panel-copy h2 {
@@ -66,29 +73,22 @@
     stroke-linejoin: round;
 }
 
-.stats-share-button-progress {
-    position: absolute;
-    inset: 0;
-    z-index: 1;
-    opacity: 0;
-    background: rgba(255, 255, 255, 0.08);
-    transition: opacity 180ms ease;
-}
-
-.stats-share-button-progress-fill {
-    display: block;
-    width: 0%;
-    height: 100%;
-    background: linear-gradient(90deg, rgba(124, 58, 237, 0.92) 0%, rgba(239, 45, 143, 0.92) 100%);
-    transition: width 220ms ease;
+.stats-share-button .vinyl-loader {
+    display: none;
+    width: 24px;
+    height: 24px;
 }
 
 .stats-share-button.is-loading {
     pointer-events: none;
 }
 
-.stats-share-button.is-loading .stats-share-button-progress {
-    opacity: 1;
+.stats-share-button.is-loading .stats-share-button-icon {
+    display: none;
+}
+
+.stats-share-button.is-loading .vinyl-loader {
+    display: inline-block;
 }
 
 .stats-share-feedback {
@@ -138,6 +138,13 @@
 .stats-minutes-card,
 .stats-card {
     padding: 22px;
+}
+
+.stats-minutes-card {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 .stats-kicker,
