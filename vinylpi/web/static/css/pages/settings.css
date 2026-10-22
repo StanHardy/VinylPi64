@@ -2281,3 +2281,12 @@ body.mobile-display-preview-open {
 .pixoo-automation-gif-picker select { flex: 1 1 170px; min-width: 0; }
 .pixoo-automation-gif-picker button { flex: 0 0 auto; }
 #pixooStopGifStatus { margin: 6px 0 0; }
+
+/* Pixoo's third settings group contains both automation options. */
+.pixoo-automations-group > .group-title { margin-bottom: 16px; }
+.pixoo-automation-option + .pixoo-automation-option {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+.pixoo-automations-group > .pixoo-automation-option:not(:last-child) .setting-group-header { margin-bottom: 0; }
