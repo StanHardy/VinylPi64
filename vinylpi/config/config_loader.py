@@ -109,7 +109,10 @@ CONFIG_DEFAULTS = {
         "base_url": "",
         "webhook_id": "vinylpi_cover_color",
         # Dedicated Off-event webhook; an empty ID disables only this event.
-        "stop_webhook_id": ""
+        "stop_webhook_id": "",
+        # Optional Pixoo-on event, sent only on an actual audio-triggered wake.
+        "wake_webhook_enabled": False,
+        "wake_webhook_id": ""
     }
 }
 

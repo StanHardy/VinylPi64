@@ -79,3 +79,31 @@ def send_recognition_stopped(*, source: str, reason: str) -> bool:
         print(f"[HA] Failed sending recognition-stopped event: {exc}")
         return False
     return True
+
+
+def send_auto_wake() -> bool:
+    """Notify HA after an Off -> Vinyl auto-wake transition.
+
+    HA can use this dedicated webhook to call its existing Pixoo-on action.
+    This must never reuse the color-sync or shutdown webhook. Failures must
+    not interrupt recognition; the caller is the background wake coordinator.
+    """
+    ha_cfg = read_config().get("homeassistant") or {}
+    if not ha_cfg.get("use_ha", False) or not ha_cfg.get("wake_webhook_enabled", False):
+        return False
+
+    base_url = str(ha_cfg.get("base_url") or "").strip().rstrip("/")
+    webhook_id = str(ha_cfg.get("wake_webhook_id") or "").strip()
+    if not base_url or not webhook_id:
+        return False
+
+    try:
+        _session.post(
+            f"{base_url}/api/webhook/{webhook_id}",
+            json={"event": "auto_wake", "source": "vinyl", "action": "pixoo_on"},
+            timeout=2,
+        ).raise_for_status()
+    except requests.RequestException as exc:
+        print(f"[HA] Failed sending auto-wake event: {exc}")
+        return False
+    return True

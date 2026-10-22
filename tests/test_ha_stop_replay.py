@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import requests
 
-from vinylpi.integrations.home_assistant import send_recognition_stopped
+from vinylpi.integrations.home_assistant import send_recognition_stopped, send_auto_wake
 from vinylpi.web.services import source
 
 
@@ -54,6 +54,56 @@ class StopWebhookTests(unittest.TestCase):
     def test_offline_ha_never_crashes_stop(self, read_config, post):
         read_config.return_value = self.cfg
         self.assertFalse(send_recognition_stopped(source="vinyl", reason="manual"))
+        post.assert_called_once()
+
+
+class AutoWakeWebhookTests(unittest.TestCase):
+    def setUp(self):
+        self.cfg = {"homeassistant": {
+            "use_ha": True,
+            "base_url": "http://homeassistant:8123/",
+            "webhook_id": "rgb-only",
+            "stop_webhook_id": "off-only",
+            "wake_webhook_enabled": True,
+            "wake_webhook_id": "on-only",
+        }}
+
+    @patch("vinylpi.integrations.home_assistant._session.post")
+    @patch("vinylpi.integrations.home_assistant.read_config")
+    def test_auto_wake_uses_dedicated_pixoo_on_webhook(self, read_config, post):
+        read_config.return_value = self.cfg
+        self.assertTrue(send_auto_wake())
+        post.assert_called_once_with(
+            "http://homeassistant:8123/api/webhook/on-only",
+            json={"event": "auto_wake", "source": "vinyl", "action": "pixoo_on"},
+            timeout=2,
+        )
+
+    @patch("vinylpi.integrations.home_assistant._session.post")
+    @patch("vinylpi.integrations.home_assistant.read_config")
+    def test_new_option_disabled_by_default(self, read_config, post):
+        read_config.return_value = {"homeassistant": {
+            "use_ha": True, "base_url": "http://homeassistant:8123", "wake_webhook_id": "on-only"
+        }}
+        self.assertFalse(send_auto_wake())
+        post.assert_not_called()
+
+    @patch("vinylpi.integrations.home_assistant._session.post")
+    @patch("vinylpi.integrations.home_assistant.read_config")
+    def test_missing_webhook_or_master_switch_prevents_notification(self, read_config, post):
+        read_config.return_value = self.cfg
+        self.cfg["homeassistant"]["use_ha"] = False
+        self.assertFalse(send_auto_wake())
+        self.cfg["homeassistant"]["use_ha"] = True
+        self.cfg["homeassistant"]["wake_webhook_id"] = ""
+        self.assertFalse(send_auto_wake())
+        post.assert_not_called()
+
+    @patch("vinylpi.integrations.home_assistant._session.post", side_effect=requests.Timeout("HA offline"))
+    @patch("vinylpi.integrations.home_assistant.read_config")
+    def test_ha_offline_does_not_block_auto_wake(self, read_config, post):
+        read_config.return_value = self.cfg
+        self.assertFalse(send_auto_wake())
         post.assert_called_once()
 
 

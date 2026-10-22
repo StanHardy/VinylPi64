@@ -7,6 +7,7 @@ from vinylpi.config.runtime import read_config
 from vinylpi.core.audio_wake import VinylAutoWakeConfig, wait_for_audio_wake
 from vinylpi.core.pickup_usage import PickupUsageConfig, PickupUsageTracker
 from vinylpi.core.stats_db import add_pickup_usage_seconds
+from vinylpi.integrations.home_assistant import send_auto_wake
 
 _IDLE_POLL_SECONDS = 1.0
 _PICKUP_FLUSH_SECONDS = 30.0
@@ -181,7 +182,11 @@ def _run() -> None:
                 _debug(
                     f"Auto-wake switching dashboard to Vinyl at {event.level_dbfs:.1f} dBFS."
                 )
-                source.set_mode("vinyl", _from_auto_wake=True)
+                status = source.set_mode("vinyl", _from_auto_wake=True)
+                if status.get("mode") == "vinyl":
+                    # Notify HA only after a successful automatic transition.
+                    # Manual starts and repeated audio checks must not fire it.
+                    send_auto_wake()
                 previous_mode = "vinyl"
                 require_rearm = True
         except Exception as exc:

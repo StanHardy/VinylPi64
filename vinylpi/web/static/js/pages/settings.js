@@ -191,6 +191,8 @@ function syncDependentSettingStates() {
     syncFallbackStates();
     setDependentState("discoveryEnabled", "discovery-details");
     setDependentState("useHA", "ha-details");
+    setDependentState("haWakeWebhookEnabled", "ha-wake-webhook-details",
+        Boolean(document.getElementById("useHA")?.checked && document.getElementById("haWakeWebhookEnabled")?.checked));
     setDependentState("discogsEnabled", "discogs-details");
     setDependentState("vinylAutoWakeEnabled", "vinyl-auto-wake-details");
     setDependentState("vinylAudioSleepEnabled", "vinyl-audio-sleep-details");
@@ -1005,6 +1007,7 @@ document.addEventListener("DOMContentLoaded", () => {
     "sideFlipEnabled",
     "discoveryEnabled",
     "useHA",
+    "haWakeWebhookEnabled",
     "debugLogs",
     "discogsEnabled",
     "vinylAutoWakeEnabled",
@@ -1207,6 +1210,10 @@ async function loadConfig() {
         homeassistant.webhook_id || "";
     document.getElementById("haStopWebhookID").value =
         homeassistant.stop_webhook_id || "";
+    document.getElementById("haWakeWebhookEnabled").checked =
+        homeassistant.wake_webhook_enabled === true;
+    document.getElementById("haWakeWebhookID").value =
+        homeassistant.wake_webhook_id || "";
 
     syncDependentSettingStates();
 }
@@ -1433,6 +1440,10 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     delete homeassistant.replay_on_stop_enabled;
     homeassistant.stop_webhook_id =
         document.getElementById("haStopWebhookID").value.trim();
+    homeassistant.wake_webhook_enabled =
+        document.getElementById("haWakeWebhookEnabled").checked;
+    homeassistant.wake_webhook_id =
+        document.getElementById("haWakeWebhookID").value.trim();
 
     try {
         const response = await fetch("/api/config", {
