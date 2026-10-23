@@ -24,9 +24,8 @@ function renderSpotifySettings(status = {}) {
 
     if (title) {
         if (connected) {
-            title.textContent = account.display_name
-                ? `Connected as ${account.display_name}`
-                : "Spotify account connected";
+            const displayName = account.display_name || account.spotify_user_id || account.account_id || "Spotify account";
+            title.textContent = `Connected as ${displayName}`;
         } else {
             title.textContent = configured ? "No Spotify account connected" : "Spotify app not configured";
         }
@@ -34,10 +33,7 @@ function renderSpotifySettings(status = {}) {
 
     if (copy) {
         if (connected) {
-            const detail = account.spotify_user_id || account.account_id || "";
-            copy.textContent = detail
-                ? `This account is linked only to the current VinylPi profile · ${detail}`
-                : "This account is linked only to the current VinylPi profile.";
+            copy.textContent = "Linked only to the current VinylPi profile.";
         } else if (configured) {
             copy.textContent = "Connect the Spotify account that should belong to the current VinylPi profile.";
         } else {

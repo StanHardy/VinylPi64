@@ -170,10 +170,25 @@
 }
 
 .form-hint {
+    display: block;
     grid-column: 2;
     color: var(--muted-2);
     font-size: 12px;
-    margin-top: -6px;
+    line-height: 1.5;
+    margin-top: 6px;
+}
+
+.form-group > .form-hint,
+.form-group > .spotify-settings-redirect,
+.form-group > .discogs-actions,
+.form-group > .spotify-settings-actions,
+.form-group > .discogs-progress {
+    margin-top: 14px;
+}
+
+.discogs-env-card + .form-hint,
+.spotify-env-card + .form-hint {
+    margin-top: 12px;
 }
 .audio-device-control {
     display: grid;
@@ -791,16 +806,18 @@
 }
 
 
-.discogs-status-card {
+.discogs-status-card,
+.spotify-settings-status-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 18px;
-    margin-bottom: 12px;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(239, 45, 143, 0.08), rgba(245, 197, 66, 0.035));
+    margin-bottom: 14px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.035);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .discogs-status-main {
@@ -855,9 +872,9 @@
 .discogs-counts > div {
     min-width: 82px;
     padding: 10px 12px;
-    border: 1px solid var(--border);
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
-    background: rgba(0, 0, 0, 0.13);
+    background: rgba(0, 0, 0, 0.14);
     text-align: center;
 }
 
@@ -880,8 +897,8 @@
 .discogs-env-card {
     display: grid;
     gap: 9px;
-    padding: 13px 14px;
-    border: 1px solid var(--border);
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 12px;
     background: rgba(0, 0, 0, 0.13);
 }
@@ -1506,18 +1523,6 @@
 
 
 /* Spotify account settings */
-.spotify-settings-status-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    margin-bottom: 12px;
-    padding: 16px;
-    border: 1px solid rgba(29, 185, 84, 0.18);
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(29, 185, 84, 0.09), rgba(124, 58, 237, 0.035));
-}
-
 .spotify-settings-status-main {
     display: flex;
     align-items: center;
@@ -1567,6 +1572,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
+    margin-top: 0;
 }
 
 .spotify-settings-actions button {
@@ -1574,7 +1580,7 @@
 }
 
 .spotify-settings-redirect {
-    margin-top: 10px;
+    margin-top: 14px;
     padding: 9px 11px;
     overflow-wrap: anywhere;
     border: 1px solid var(--border);
@@ -1595,12 +1601,14 @@
 }
 
 @media (max-width: 700px) {
+    .discogs-status-card,
     .spotify-settings-status-card {
         align-items: flex-start;
         flex-direction: column;
     }
 
-    .spotify-settings-actions button {
+    .spotify-settings-actions button,
+    .discogs-actions button {
         width: 100%;
     }
 }
