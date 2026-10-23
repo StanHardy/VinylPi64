@@ -1153,7 +1153,7 @@ async function loadPixooAutomationGifs(selectedId = "", refresh = false) {
             select.add(new Option(`Saved GIF (${selectedId})`, selectedId));
         }
         select.value = selectedId;
-        if (status) status.textContent = `${(data.gifs || []).length} liked GIF(s) ${data.cached ? "from cache" : "loaded"}. Selection is saved automatically.`;
+        if (status) status.textContent = `${(data.gifs || []).length} liked GIFs`;
     } catch (error) {
         select.replaceChildren(new Option("No GIF selected", ""));
         if (selectedId) select.add(new Option(`Saved GIF (${selectedId})`, selectedId));

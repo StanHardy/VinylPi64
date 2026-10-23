@@ -82,6 +82,12 @@ class LogsTests(unittest.TestCase):
         self.assertEqual(len(logs.read_events(level='issues')), 1)
         self.assertEqual(len(logs.read_events(level='all')), 3)
 
+    def test_unavailable_database_is_nonfatal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # sqlite3 cannot open a directory as a database file.
+            with patch.object(logs, "LOG_PATH", Path(tmp)):
+                logs.append("Recording failed", level="ERROR")
+
     def test_redaction_and_concurrent_writers(self):
         def write(i):
             logs.append(f'worker-{i} token=PRIVATEKEY and Bearer HEADERSECRET', level='INFO')

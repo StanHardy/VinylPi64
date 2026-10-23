@@ -72,7 +72,7 @@
     }
     function renderAll() {
         if (!entries.length) {
-            placeholder(showHistory ? 'No saved messages match this filter.' : 'No new messages match this filter. Use Show history to see older messages.');
+            placeholder(showHistory ? 'No matching messages in history.' : 'No new messages match this filter.');
         } else {
             const fragment = document.createDocumentFragment();
             entries.forEach(item => fragment.append(entryNode(item)));
@@ -245,7 +245,7 @@
             const config = await response.json();
             verbose.checked = Boolean(config.debug?.logs);
             verbose.disabled = false;
-            verboseHelp.textContent = 'Enable extra recording and recognition messages (also in Settings).';
+            verboseHelp.textContent = '';
         } catch {
             verboseHelp.textContent = 'Debug setting unavailable; existing messages remain accessible.';
         }
@@ -259,7 +259,7 @@
                 body: JSON.stringify({ debug: { logs: enabled } }),
             });
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            verboseHelp.textContent = enabled ? 'Detailed messages enabled.' : 'Detailed messages disabled; warnings/errors are still captured.';
+            verboseHelp.textContent = '';
             if (enabled && level.value === 'issues') {
                 level.value = 'all';
                 saveLevel();

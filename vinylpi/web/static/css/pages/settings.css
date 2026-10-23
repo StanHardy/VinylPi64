@@ -1579,25 +1579,8 @@
     min-width: 150px;
 }
 
-.spotify-settings-redirect {
-    margin-top: 14px;
-    padding: 9px 11px;
-    overflow-wrap: anywhere;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: rgba(0, 0, 0, 0.12);
-    color: var(--muted);
-    font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
-    font-size: 11px;
-}
-
 .spotify-settings-error {
     color: #fca5a5 !important;
-}
-
-.spotify-env-card code {
-    color: #86efac;
-    border-color: rgba(29, 185, 84, 0.24);
 }
 
 @media (max-width: 700px) {
@@ -2303,3 +2286,14 @@ body.mobile-display-preview-open {
 .pixoo-device-hint { margin-top: 8px; line-height: 1.5; }
 #pixooDeviceStatus { margin-top: 8px; }
 #scanPixooDevices:disabled { cursor: progress; opacity: .55; }
+
+/* Hierarchy: automation names are labels within Automations, not section headers. */
+.pixoo-automations-group .pixoo-automation-option .group-title {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+/* Empty dynamic notices don't reserve extra space. */
+#pixooStopGifStatus:empty { display: none; }

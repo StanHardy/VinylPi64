@@ -11,7 +11,7 @@
 {% block page_scripts %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ url_for('static', filename='js/pages/stats.js') }}?v=20261022-spin" defer></script>
-    <script src="{{ url_for('static', filename='js/pages/spotify_stats.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_stats.js') }}?v=20261023-clean-ui" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -47,7 +47,7 @@
                 <strong id="stats-minutes" class="stats-minutes-value">—</strong>
                 <span class="stats-unit">minutes</span>
             </div>
-            <div id="stats-description" class="stats-description">Calculated from confirmed vinyl recognitions.</div>
+            
             <div id="stats-share-loading-status" class="stats-share-loading-status hidden" role="status" aria-live="polite">
                 <span class="vinyl-loader" aria-hidden="true"></span>
                 <span>Preparing Spin Report…</span>
@@ -89,7 +89,7 @@
             <div class="stats-share-panel-copy">
                 <span class="eyebrow">Share</span>
                 <h2>Spin Report</h2>
-                <p id="stats-share-description">Turn your listening stats into a shareable card.</p>
+                <p id="stats-share-description">Share your VinylPi listening statistics with friends.</p>
             </div>
             <button id="stats-share-button" class="btn-primary stats-share-button" type="button" aria-label="Create share preview">
                 <span class="stats-share-button-face">

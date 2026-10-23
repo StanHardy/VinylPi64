@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261023-ui-polish">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261023-clean-ui">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261023-ui-polish" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261023-clean-ui" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261023-ui-polish" defer></script>
 {% endblock %}
 
@@ -285,7 +285,7 @@
                                         <div class="display-range-label"><label for="imageLineSpacingMargin">Text line gap</label><output id="imageLineSpacingMarginValue" for="imageLineSpacingMargin">3 px</output></div>
                                         <input type="range" id="imageLineSpacingMargin" min="0" max="8" step="1">
                                     </div>
-                                    <div class="form-hint display-layout-hint">Layout is kept within the 64×64 canvas.</div>
+                                    
                                 </div>
 
                                 <div class="form-group">
@@ -397,7 +397,7 @@
                         <div class="form-group" data-setting-row="fallback-shared-details">
                             <div class="group-title">Activation</div>
                             <div class="form-row"><label for="fallbackAllowedFailures">Show after failed recognitions</label><input type="number" id="fallbackAllowedFailures" min="1"></div>
-                            <div class="form-hint">Controls the display fallback only.</div>
+                            
                         </div>
                     </div>
                 </section>
@@ -425,9 +425,9 @@
                                     </button>
                                 </div>
                                 <div id="pixooDeviceStatus" class="form-hint" role="status" aria-live="polite" hidden></div>
-                                <div class="form-hint pixoo-device-hint">The selected IP is saved automatically for this profile. Reserving a fixed IP for your Pixoo in your router (DHCP reservation) prevents its address from changing.</div>
+                                <div class="form-hint pixoo-device-hint">Tip: Reserve a fixed IP for your Pixoo in your router.</div>
                             </div>
-                            <div class="form-row"><label for="divoomDeviceName">Device name</label><input type="text" id="divoomDeviceName" placeholder="espressif"></div>
+                            <div class="form-row"><label for="divoomDeviceName">Device name</label><input type="text" id="divoomDeviceName" placeholder="Pixoo64"></div>
                             <div class="form-row"><label for="divoomDeviceID">Device ID</label><input type="text" id="divoomDeviceID" placeholder="0"></div>
                             <div class="form-row"><label for="divoomDeviceMAC">Device MAC</label><input type="text" id="divoomDeviceMAC" placeholder=""></div>
                             <div class="form-row"><label for="divoomTimeout">Timeout</label><input type="number" id="divoomTimeout" step="0.1"></div>
@@ -436,10 +436,10 @@
 
                         <div class="form-group">
                             <div class="group-title">Automatic discovery (fallback)</div>
-                            <div class="form-hint pixoo-device-hint">When no IP is saved or the saved device becomes unreachable, VinylPi can search again. Automatic scans normally use the range below and are rate-limited (expanded if your saved IP lies outside it). The search button above checks the entire configured /24 subnet.</div>
+                            <div class="form-hint pixoo-device-hint">VinylPi searches automatically if no device is selected or your Pixoo becomes unreachable.</div>
                             <div class="form-row"><label for="discoveryEnabled">Auto discovery enabled</label><input type="checkbox" id="discoveryEnabled"></div>
                             <div data-setting-row="discovery-details">
-                                <div class="form-row"><label for="subnetPrefix">Subnet prefix</label><input type="text" id="subnetPrefix" placeholder="192.168.2."></div>
+                                <div class="form-row"><label for="subnetPrefix">Subnet prefix</label><input type="text" id="subnetPrefix" placeholder="192.168.1."></div>
                                 <div class="form-row"><label for="ipRangeStart">IP range start</label><input type="number" id="ipRangeStart" min="1" max="254"></div>
                                 <div class="form-row"><label for="ipRangeEnd">IP range end</label><input type="number" id="ipRangeEnd" min="1" max="254"></div>
                             </div>
@@ -470,7 +470,7 @@
                                         <button type="button" id="pixooRefreshLikes" title="Refresh liked GIFs from Divoom">Refresh</button>
                                     </div>
                                 </div>
-                                <div class="form-hint" id="pixooStopGifStatus" role="status" aria-live="polite">Saved per profile. Select a GIF to use it on shutdown.</div>
+                                <div class="form-hint" id="pixooStopGifStatus" role="status" aria-live="polite"></div>
                             </div>
                         </div>
                     </div>
@@ -502,7 +502,7 @@
                                 <span>Token in <strong>vinylpi.env</strong></span>
                                 <code>DISCOGS_API_TOKEN=your_personal_access_token</code>
                             </div>
-                            <div class="form-hint">Stored server-side in <strong>vinylpi.env</strong>. Restart VinylPi after changing it.</div>
+                            <div class="form-hint">Restart VinylPi after updating the token.</div>
                             <div class="discogs-actions">
                                 <button type="button" class="btn-primary" id="discogsConnect">Check connection</button>
                                 <button type="button" id="discogsSync" disabled>Sync collection</button>
@@ -518,7 +518,7 @@
                             <div class="form-row"><label for="discogsEnabled">Use Discogs matching</label><input type="checkbox" id="discogsEnabled"></div>
                             <div data-setting-row="discogs-details">
                                 <div class="form-row"><label for="discogsPreferCollection">Prefer collection matches</label><input type="checkbox" id="discogsPreferCollection"></div>
-                                <div class="form-hint">Prefer matching releases from your collection.</div>
+                                
                                 <div class="form-row cover-source-row">
                                     <span id="discogsCoverSourceLabel" class="cover-source-label">Preferred album cover</span>
                                     <div class="cover-source-segmented" role="radiogroup" aria-labelledby="discogsCoverSourceLabel">
@@ -526,11 +526,11 @@
                                         <label><input type="radio" name="discogsCoverSource" value="discogs"><span>Discogs</span></label>
                                     </div>
                                 </div>
-                                <div class="form-hint">Shazam (default) uses the clean digital artwork; Discogs uses the image of your exact record pressing. Discogs matching and tracklist data work in both modes.</div>
+                                <div class="form-hint">Shazam uses digital artwork; Discogs uses your record’s cover.</div>
                                 <div class="form-row"><label for="discogsSequenceMatching">Use record sequence</label><input type="checkbox" id="discogsSequenceMatching"></div>
-                                <div class="form-hint">Use track order to improve matching.</div>
+                                
                                 <div class="form-row"><label for="discogsInferNext">Estimate an unrecognized next track</label><input type="checkbox" id="discogsInferNext"></div>
-                                <div class="form-hint">Temporarily estimate the next track when recognition fails near a track boundary.</div>
+                                
                                 <div class="form-row"><label for="discogsVinylOnly">Import vinyl releases only</label><input type="checkbox" id="discogsVinylOnly"></div>
                                 <div class="form-row"><label for="discogsMinConfidence">Minimum confidence</label><input type="number" id="discogsMinConfidence" min="0.5" max="0.95" step="0.01"></div>
                             </div>
@@ -552,7 +552,6 @@
                                     <div class="spotify-settings-status-copy" id="spotifySettingsStatusCopy">The connection belongs only to the currently active VinylPi profile.</div>
                                 </div>
                             </div>
-                            
                         </div>
 
                         <div class="form-group">
@@ -572,11 +571,8 @@
                         <div class="form-group">
                             <div class="group-title">App credentials</div>
                             <div class="discogs-env-card spotify-env-card">
-                                <span id="spotifySettingsAppStatus">Checking <strong>vinylpi.env</strong>…</span>
-                                <code>SPOTIFY_CLIENT_ID=… &nbsp; SPOTIFY_CLIENT_SECRET=… &nbsp; SPOTIFY_REDIRECT_URI=…</code>
+                                <span id="spotifySettingsAppStatus">Checking Spotify app configuration…</span>
                             </div>
-                            <div class="form-hint">App credentials stay in <strong>vinylpi.env</strong>; account tokens stay server-side per profile.</div>
-                            <div id="spotifySettingsRedirect" class="spotify-settings-redirect"></div>
                         </div>
                     </div>
                 </section>
@@ -615,7 +611,7 @@
                             <div data-setting-row="vinyl-auto-wake-details">
                                 <div class="form-row"><label for="vinylAutoWakeThreshold">Wake threshold (dBFS)</label><input type="number" id="vinylAutoWakeThreshold" min="-100" max="-1" step="0.5"></div>
                                 <div class="form-row"><label for="vinylAutoWakeConfirmSeconds">Confirmation (seconds)</label><input type="number" id="vinylAutoWakeConfirmSeconds" min="0.1" max="30" step="0.1"></div>
-                                <div class="form-hint">Uses low-power level monitoring only; Shazam stays idle until wake-up.</div>
+                                
                             </div>
                         </div>
 
@@ -646,7 +642,7 @@
                             <div data-setting-row="vinyl-audio-sleep-details">
                                 <div class="form-row"><label for="vinylAudioSleepThreshold">Sleep threshold (dBFS)</label><input type="number" id="vinylAudioSleepThreshold" min="-120" max="-1" step="0.5"></div>
                                 <div class="form-row"><label for="vinylAudioSleepConfirmSeconds">Grace period (seconds)</label><input type="number" id="vinylAudioSleepConfirmSeconds" min="0.1" max="600" step="0.1"></div>
-                                <div class="form-hint">The delay avoids stopping during short pauses between tracks.</div>
+                                
                             </div>
                         </div>
 

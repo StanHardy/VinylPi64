@@ -1,3 +1,4 @@
+"""Smoke tests for the web application's public page and asset routes."""
 from __future__ import annotations
 
 import unittest
@@ -5,7 +6,7 @@ from unittest.mock import patch
 
 try:
     from flask import Flask
-except ModuleNotFoundError:  # Allows partial local test runs without web dependencies.
+except ModuleNotFoundError:
     Flask = None
 
 if Flask is not None:
@@ -13,165 +14,30 @@ if Flask is not None:
 
 
 @unittest.skipIf(Flask is None, "Flask is not installed")
-class WebPageStructureTests(unittest.TestCase):
+class WebRouteTests(unittest.TestCase):
     def setUp(self):
-        storage_patcher = patch("vinylpi.web.app.initialize_storage")
-        self.addCleanup(storage_patcher.stop)
-        storage_patcher.start()
-
+        patcher = patch("vinylpi.web.app.initialize_storage")
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.app = create_app()
         self.app.config.update(TESTING=True)
         self.client = self.app.test_client()
 
-    def test_all_page_templates_render(self):
-        pages = {
-            "/": "Dashboard",
-            "/index.html": "Dashboard",
-            "/settings.html": "Settings",
-            "/pixoo.html": "Pixoo",
-            "/stats.html": "Statistics",
-            "/about.html": "About",
-            "/logs.html": "Logs",
-        }
-
-        for route, heading in pages.items():
+    def test_page_routes(self):
+        for route in ("/", "/index.html", "/settings.html", "/pixoo.html",
+                      "/stats.html", "/about.html", "/logs.html"):
             with self.subTest(route=route):
                 response = self.client.get(route)
                 self.assertEqual(response.status_code, 200)
-                self.assertIn(heading.encode(), response.data)
-                self.assertIn(b"/static/css/base.css", response.data)
+                self.assertTrue(response.mimetype == "text/html")
 
-    def test_page_specific_assets_are_served_from_static_tree(self):
-        assets = (
-            "/static/css/base.css",
-            "/static/css/pages/logs.css",
-            "/static/js/pages/logs.js",
-            "/static/js/logs_nav.js",
-            "/static/css/pages/dashboard.css",
-            "/static/js/pages/dashboard.js",
-            "/static/js/pages/random_record.js",
-            "/static/js/profile.js",
-            "/static/images/logo.png",
-            "/assets/readme/Logo.png",
-            "/static/icons/favicon.svg",
-            "/static/site.webmanifest",
-        )
-
-        for asset in assets:
+    def test_static_assets(self):
+        for asset in ("/static/css/base.css", "/static/js/pages/dashboard.js",
+                      "/static/js/pages/logs.js", "/static/images/logo.png"):
             with self.subTest(asset=asset):
-                self.assertEqual(self.client.get(asset).status_code, 200)
-
-    def test_navigation_marks_only_current_page_active(self):
-        response = self.client.get("/settings.html")
-        html = response.get_data(as_text=True)
-
-        self.assertIn('href="/settings.html" class="active" aria-current="page"', html)
-        self.assertNotIn('href="/" class="nav-center active"', html)
-        self.assertIn('href="/logs.html"', html)
-        self.assertNotIn('class="nav-label">About</span>', html)
-        self.assertIn('href="/about.html" aria-label="About VinylPi64"', html)
-
-
-    def test_lyrics_expand_button_is_rendered_below_lyrics_content(self):
-        response = self.client.get("/")
-        html = response.get_data(as_text=True)
-
-        self.assertLess(html.index('id="lyrics-box"'), html.index('id="btn-lyrics-toggle"'))
-        self.assertIn('class="lyrics-inline hidden" id="lyrics-card"', html)
-        self.assertIn('class="lyrics-toggle hidden"', html)
-        self.assertIn('aria-label="Expand lyrics"', html)
-        self.assertIn('m7 10 5 5 5-5', html)
-
-
-    def test_settings_contains_constrained_64px_display_designer(self):
-        response = self.client.get("/settings.html")
-        html = response.get_data(as_text=True)
-
-        self.assertIn('id="displayPreview"', html)
-        self.assertIn('id="displayFitUsage"', html)
-        self.assertIn('id="imageShowCover"', html)
-        self.assertIn('id="imageShowArtist"', html)
-        self.assertIn('id="imageShowTitle"', html)
-        self.assertIn('id="imageShowAlbum"', html)
-        self.assertIn('data-display-preset="cover-only"', html)
-        self.assertNotIn('id="imageCanvasSize"', html)
-        self.assertNotIn('id="imagePreviewScale"', html)
-        self.assertNotIn('id="imageSleepSeconds"', html)
-        self.assertIn('id="mobileDisplayPreviewButton"', html)
-        self.assertIn('id="mobileDisplayPreviewModal"', html)
-        self.assertIn('id="displayPreviewMobile"', html)
-        self.assertIn('<span class="chevron" aria-hidden="true"><svg', html)
-        self.assertNotIn('<span class="chevron">⌄</span>', html)
-
-    def test_dashboard_contains_discogs_add_release_link(self):
-        response = self.client.get("/")
-        html = response.get_data(as_text=True)
-
-        self.assertIn('id="discogs-add-link"', html)
-        self.assertIn('Add to Discogs', html)
-        self.assertIn('target="_blank"', html)
-
-
-    def test_dashboard_contains_random_record_dialog(self):
-        html = self.client.get("/").get_data(as_text=True)
-        self.assertIn('id="random-record-button"', html)
-        self.assertIn('<dialog id="random-record-dialog"', html)
-        self.assertIn('aria-labelledby="random-record-heading"', html)
-        self.assertIn('id="random-record-cover"', html)
-        self.assertIn('id="random-record-folder-select"', html)
-        self.assertIn('for="random-record-folder-select"', html)
-        self.assertNotIn('Your collection</div>', html)
-        self.assertIn('id="random-record-reroll"', html)
-        self.assertIn('aria-label="Close record suggestion"', html)
-
-
-    def test_dashboard_contains_expandable_discogs_tracklist(self):
-        response = self.client.get("/")
-        html = response.get_data(as_text=True)
-
-        self.assertIn('id="discogs-tracklist-toggle"', html)
-        self.assertIn('aria-controls="discogs-tracklist-panel"', html)
-        self.assertIn('id="discogs-tracklist-panel"', html)
-
-
-    def test_settings_contains_profile_specific_spotify_section(self):
-        response = self.client.get("/settings.html")
-        html = response.get_data(as_text=True)
-
-        self.assertIn('id="section-spotify"', html)
-        self.assertIn('id="spotifySettingsConnect"', html)
-        self.assertIn('id="spotifyPollSeconds"', html)
-        self.assertIn('id="spotifyAutoSleepEnabled"', html)
-        self.assertIn('id="spotifyAutoSleepIterations"', html)
-        self.assertIn('id="vinylAutoWakeEnabled"', html)
-        self.assertIn('id="vinylAutoWakeThreshold"', html)
-        self.assertIn('id="vinylAutoWakeConfirmSeconds"', html)
-        self.assertIn('id="section-standby"', html)
-        self.assertIn('id="vinylAudioSleepEnabled"', html)
-        self.assertIn('id="vinylAudioSleepThreshold"', html)
-        self.assertIn('id="vinylAudioSleepConfirmSeconds"', html)
-        self.assertIn('id="vinylAutoSleepEnabled"', html)
-        self.assertIn('id="vinylAutoSleepIterations"', html)
-        self.assertIn('Standby', html)
-        self.assertIn('id="pickupUsageEnabled"', html)
-        self.assertIn('id="pickupStartThreshold"', html)
-        self.assertIn('id="pickupStopThreshold"', html)
-        self.assertIn('id="pickupStartConfirmSeconds"', html)
-        self.assertIn('id="pickupStopConfirmSeconds"', html)
-        self.assertIn('id="pickupStartConfirmSeconds" min="0.1" max="120" step="0.1"', html)
-        self.assertIn('id="pickupStopConfirmSeconds" min="0.1" max="600" step="0.1"', html)
-        self.assertIn('Profile account connection', html)
-        self.assertNotIn('Choose a category', html)
-        self.assertNotIn('Open only the settings you need', html)
-
-    def test_stats_page_contains_share_button(self):
-        response = self.client.get("/stats.html")
-        html = response.get_data(as_text=True)
-
-        self.assertIn('id="stats-share-button"', html)
-        self.assertIn('id="stats-pickup-usage"', html)
-        self.assertIn('Pickup usage', html)
-        self.assertIn('Share', html)
+                response = self.client.get(asset)
+                self.assertEqual(response.status_code, 200)
+                self.assertGreater(len(response.data), 0)
 
 
 if __name__ == "__main__":

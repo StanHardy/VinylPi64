@@ -1,7 +1,7 @@
 {% extends "layouts/base.html" %}
 {% block title %}Logs – VinylPi64{% endblock %}
 {% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/logs.css') }}?v=20261023-logs-prefs">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/logs.css') }}?v=20261023-clean-ui">
 {% endblock %}
 {% block page_scripts %}
 <script src="{{ url_for('static', filename='js/pages/logs.js') }}?v=20261023-logs-prefs" defer></script>
@@ -17,7 +17,6 @@
             <div>
                 <span class="eyebrow">System diagnostics</span>
                 <h1>Messages &amp; errors</h1>
-                <p>Warnings and errors from VinylPi, Spotify and the dashboard. Enable all messages to inspect recognition activity.</p>
             </div>
             <div class="logs-status" role="status"><span id="logsLiveDot" class="logs-live-dot"></span><span id="logsLiveStatus">Connecting…</span></div>
         </div>
@@ -40,7 +39,7 @@
             </div>
             <div class="logs-verbose-wrap">
                 <label class="logs-verbose-toggle"><input type="checkbox" id="logsVerbose" disabled><span>Detailed trace logging</span></label>
-                <span class="logs-verbose-help" id="logsVerboseHelp">Loading debug setting…</span>
+                <span class="logs-verbose-help" id="logsVerboseHelp" role="status" aria-live="polite"></span>
             </div>
             <div class="logs-actions">
                 <div class="logs-count"><span id="logsCount">0</span> messages <span id="logsNew" class="logs-new" hidden></span></div>
@@ -55,7 +54,6 @@
                 <div class="logs-empty">Loading messages…</div>
             </div>
             <p id="logsFeedback" class="logs-feedback" role="status" aria-live="polite"></p>
-            <p class="logs-footnote">Stored locally on this device (latest 10,000 messages). HTTP access requests are excluded. Clear view stays cleared across refreshes and devices. Show history restores access to older entries without deleting them.</p>
         </section>
     </section>
 </main>

@@ -1,19 +1,26 @@
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 from vinylpi.core.display import _overlay_side_letter
 
 
 class SideFlipImageTests(unittest.TestCase):
     def setUp(self):
-        self.template_path = Path("assets/fallback/turn/turn_record.png")
+        self.template = Image.new("RGB", (64, 64), (4, 4, 12))
+        # Light pixels in the existing SIDE label determine the letter color.
+        ImageDraw.Draw(self.template).rectangle((21, 54, 36, 58), fill=(235, 160, 48))
+        # Fix glyph metrics so the test is independent of installed user fonts.
+        from unittest.mock import patch
+        patcher = patch("vinylpi.core.display._get_font_for_config",
+                        return_value=(ImageFont.load_default(size=5), 5))
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_target_side_letter_is_inserted_only_in_badge_slot(self):
-        template = Image.open(self.template_path).convert("RGB")
+        template = self.template.copy()
 
         side_b = _overlay_side_letter(template.copy(), "B")
         side_d = _overlay_side_letter(template.copy(), "D")
@@ -27,7 +34,7 @@ class SideFlipImageTests(unittest.TestCase):
         self.assertLessEqual(bbox[3], 59)
 
     def test_multi_disc_side_f_is_rendered(self):
-        template = Image.open(self.template_path).convert("RGB")
+        template = self.template.copy()
         side_f = _overlay_side_letter(template.copy(), "F")
 
         slot = side_f.crop((38, 54, 43, 59))

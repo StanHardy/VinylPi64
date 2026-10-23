@@ -12,15 +12,12 @@ function statsScopeCopy(scope) {
     return {
         vinyl: {
             label: "Vinyl listening overview",
-            description: "Calculated from confirmed vinyl recognitions.",
         },
         spotify: {
             label: "Spotify listening overview",
-            description: "Calculated from Spotify playback progress while the Spotify source is enabled.",
         },
         combined: {
             label: "Combined listening overview",
-            description: "Vinyl and Spotify listening data combined.",
         },
     }[scope] || {};
 }
@@ -36,13 +33,11 @@ function updateStatsScopeUI() {
 
     const copy = statsScopeCopy(vinylPiStatsScope);
     const overview = document.getElementById("stats-overview-label");
-    const description = document.getElementById("stats-description");
     if (overview) overview.textContent = copy.label || "Listening overview";
-    if (description) description.textContent = copy.description || "";
 
     const shareDescription = document.getElementById("stats-share-description");
     if (shareDescription) {
-        shareDescription.textContent = `Create a shareable ${vinylPiStatsScope} listening card.`;
+        shareDescription.textContent = "Share your VinylPi listening statistics with friends.";
     }
 
     const pickupUsageRow = document.getElementById("stats-pickup-usage-row");

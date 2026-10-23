@@ -18,7 +18,6 @@ function renderSpotifySettings(status = {}) {
     const connect = document.getElementById("spotifySettingsConnect");
     const disconnect = document.getElementById("spotifySettingsDisconnect");
     const appStatus = document.getElementById("spotifySettingsAppStatus");
-    const redirect = document.getElementById("spotifySettingsRedirect");
 
     dot?.classList.toggle("connected", connected);
 
@@ -52,11 +51,6 @@ function renderSpotifySettings(status = {}) {
         appStatus.innerHTML = configured
             ? 'Spotify app credentials found in <strong>vinylpi.env</strong>'
             : 'Spotify app credentials missing in <strong>vinylpi.env</strong>';
-    }
-    if (redirect) {
-        redirect.textContent = status.redirect_uri
-            ? `Redirect URI: ${status.redirect_uri}`
-            : "SPOTIFY_REDIRECT_URI is not configured.";
     }
 }
 

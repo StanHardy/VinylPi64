@@ -12,10 +12,16 @@ from vinylpi.profiles import (
     reset_profile_storage_override,
     set_profile_storage_override,
 )
-from vinylpi.web.app import create_app
+try:
+    from flask import Flask
+except ModuleNotFoundError:
+    Flask = None
+
+if Flask is not None:
+    from vinylpi.web.app import create_app
 
 
-class RandomRecordTests(unittest.TestCase):
+class _RandomRecordSetup:
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
@@ -26,21 +32,10 @@ class RandomRecordTests(unittest.TestCase):
             patch("vinylpi.core.database.get_active_db_path", side_effect=lambda: (
                 Path(self.temp.name) / f"{get_profile_storage_override() or 'default'}.db"
             )),
-            patch("vinylpi.web.app.initialize_storage"),
-            patch("vinylpi.web.app._session_secret", return_value="test-secret"),
-            patch("vinylpi.web.app.profile_exists", return_value=True),
         )
         for patcher in patches:
             patcher.start()
             self.addCleanup(patcher.stop)
-        mode_patcher = patch("vinylpi.web.routes.discogs_api.get_mode", return_value="off")
-        self.mode = mode_patcher.start()
-        self.addCleanup(mode_patcher.stop)
-        app = create_app()
-        app.config.update(TESTING=True)
-        self.client = app.test_client()
-        with self.client.session_transaction() as session:
-            session["vinylpi_profile_id"] = "profile-a"
 
     def add_release(self, release_id=1, **fields):
         upsert_release_summary({
@@ -48,6 +43,7 @@ class RandomRecordTests(unittest.TestCase):
             "artist": "Artist", "cover_url": "https://i.discogs.com/cover.jpg", **fields,
         })
 
+class RandomRecordStorageTests(_RandomRecordSetup, unittest.TestCase):
     def test_empty_collection_returns_none(self):
         self.assertIsNone(get_random_release())
 
@@ -81,6 +77,27 @@ class RandomRecordTests(unittest.TestCase):
     def test_missing_cover_does_not_exclude_record(self):
         self.add_release(cover_url=None)
         self.assertIsNone(get_random_release()["cover_url"])
+
+@unittest.skipIf(Flask is None, "Flask is not installed")
+class RandomRecordApiTests(_RandomRecordSetup, unittest.TestCase):
+    def setUp(self):
+        super().setUp()
+        for target, kwargs in (
+            ("vinylpi.web.app.initialize_storage", {}),
+            ("vinylpi.web.app._session_secret", {"return_value": "test-secret"}),
+            ("vinylpi.web.app.profile_exists", {"return_value": True}),
+        ):
+            patcher = patch(target, **kwargs)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        mode_patcher = patch("vinylpi.web.routes.discogs_api.get_mode", return_value="off")
+        self.mode = mode_patcher.start()
+        self.addCleanup(mode_patcher.stop)
+        app = create_app()
+        app.config.update(TESTING=True)
+        self.client = app.test_client()
+        with self.client.session_transaction() as session:
+            session["vinylpi_profile_id"] = "profile-a"
 
     @patch("requests.sessions.Session.request", side_effect=AssertionError("Unexpected network request"))
     def test_api_reads_local_collection_in_off_and_vinyl_modes(self, outbound_request):

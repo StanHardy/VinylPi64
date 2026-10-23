@@ -63,6 +63,15 @@ class VersionInfoTests(unittest.TestCase):
         self.assertEqual(info["status"], "Release")
         self.assertEqual(info["display"], "v0.9.0")
 
+    def test_checkout_older_tag(self):
+        (self.repo / "vinylpi" / "main.py").write_text("print('next')")
+        self._git("add", "vinylpi/main.py")
+        self._git("commit", "-qm", "Next release")
+        self._git("tag", "v0.9.0")
+        self.assertEqual(_version_for_root(self.repo)["display"], "v0.9.0")
+        self._git("switch", "--detach", "v0.8")
+        self.assertEqual(_version_for_root(self.repo)["display"], "v0.8")
+
     def test_outside_git_checkout_fails_gracefully(self):
         with tempfile.TemporaryDirectory() as folder:
             info = _version_for_root(Path(folder))

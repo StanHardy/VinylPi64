@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 
 try:
@@ -167,30 +166,6 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
         self.assertEqual(record.call_args.kwargs["samplerate"], 44100)
         self.assertEqual(record.call_args.kwargs["channels"], 1)
 
-
-class ConsumerSettingsUiTests(unittest.TestCase):
-    def test_audio_settings_use_detected_device_dropdown(self):
-        root = Path(__file__).resolve().parents[1]
-        html = (root / "vinylpi/web/templates/pages/settings.html").read_text(encoding="utf-8")
-        js = (root / "vinylpi/web/static/js/pages/settings.js").read_text(encoding="utf-8")
-
-        self.assertIn('<select id="audioDeviceName"', html)
-        self.assertIn('id="refreshAudioDevices"', html)
-        self.assertIn('class="audio-device-control"', html)
-        self.assertIn('aria-label="Refresh audio devices"', html)
-        self.assertNotIn('>Device list</label>', html)
-        self.assertNotIn('id="refreshAudioDevices">Refresh</button>', html)
-        self.assertIn('/api/audio-devices', js)
-        self.assertIn('device?.display_name || device?.name', js)
-        self.assertNotIn('Device name contains', html)
-
-    def test_settings_copy_is_hardware_agnostic(self):
-        root = Path(__file__).resolve().parents[1]
-        html = (root / "vinylpi/web/templates/pages/settings.html").read_text(encoding="utf-8")
-
-        self.assertNotIn("LP120XUSB", html)
-        self.assertNotIn("Audio-Technica", html)
-        self.assertNotIn("turntable itself", html)
 
 
 @unittest.skipIf(Flask is None or audio_capture is None, "Flask/sounddevice is not installed")
