@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import tempfile
+import threading
+import sqlite3
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -89,16 +91,47 @@ class LogsTests(unittest.TestCase):
                 logs.append("Recording failed", level="ERROR")
 
     def test_redaction_and_concurrent_writers(self):
+        start = threading.Barrier(4)
+
         def write(i):
+            if i < 4:
+                start.wait(timeout=5)
             logs.append(f'worker-{i} token=PRIVATEKEY and Bearer HEADERSECRET', level='INFO')
+
         with ThreadPoolExecutor(max_workers=4) as pool:
             list(pool.map(write, range(32)))
         rows = logs.read_events(level='all')
         self.assertEqual(len(rows), 32)
-        for row in rows:
-            self.assertNotIn('PRIVATEKEY', row['message'])
-            self.assertNotIn('HEADERSECRET', row['message'])
-            self.assertIn('[redacted]', row['message'])
+        self.assertEqual(
+            {row['message'] for row in rows},
+            {f'worker-{i} token=[redacted] and Bearer [redacted]' for i in range(32)},
+        )
+
+    def test_busy_insert_is_retried(self):
+        conn = logs._connection()
+
+        class LockedOnce:
+            calls = 0
+
+            def execute(self, sql, params=()):
+                if sql.startswith('INSERT INTO events'):
+                    self.calls += 1
+                    if self.calls == 1:
+                        raise sqlite3.OperationalError('database is locked')
+                return conn.execute(sql, params)
+
+        wrapper = LockedOnce()
+        with patch.object(logs, '_connection', return_value=wrapper):
+            logs.append('write retried', level='INFO')
+        self.assertEqual(wrapper.calls, 2)
+        self.assertEqual([row['message'] for row in logs.read_events(level='all')], ['write retried'])
+
+    def test_failed_warning_write_does_not_hide_next_warning(self):
+        message = 'Unique failed warning after broken database'
+        with patch.object(logs, '_connection', side_effect=sqlite3.OperationalError('unable to open database')):
+            logs.append(message, level='WARNING', source='Test')
+        logs.append(message, level='WARNING', source='Test')
+        self.assertEqual([row['message'] for row in logs.read_events(level='issues')], [message])
 
 
 if __name__ == '__main__':

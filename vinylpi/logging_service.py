@@ -26,6 +26,8 @@ _local = threading.local()
 _original_print = builtins.print
 _installed = False
 _install_lock = threading.Lock()
+_connection_init_lock = threading.Lock()
+_BUSY_RETRY_DELAYS = (0.0, 0.03, 0.08)
 _source = "App"
 _recent_issues: dict[tuple[str, str, str], float] = {}
 _recent_lock = threading.Lock()
@@ -74,29 +76,54 @@ def classify(message: str) -> str:
     return "INFO"
 
 
+def _is_busy(exc: sqlite3.OperationalError) -> bool:
+    """Retry only transient SQLite lock contention, not unrelated SQL errors."""
+    code = getattr(exc, "sqlite_errorcode", None)
+    if code is not None:
+        return (code & 0xff) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+    return "locked" in str(exc).lower() or "busy" in str(exc).lower()
+
+
 def _connection() -> sqlite3.Connection:
     path = Path(LOG_PATH)
     conn = getattr(_local, "connection", None)
-    existing_path = getattr(_local, "path", None)
     pid = os.getpid()
-    if conn is not None and existing_path == str(path) and getattr(_local, "pid", None) == pid:
+    if conn is not None and getattr(_local, "path", None) == str(path) and getattr(_local, "pid", None) == pid:
         return conn
     if conn is not None:
         try:
             conn.close()
         except sqlite3.Error:
             pass
+    _local.connection = None
     path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(path), timeout=2, isolation_level=None)
-    conn.execute("PRAGMA busy_timeout=2000")
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("CREATE TABLE IF NOT EXISTS events ("
-                 "id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, "
-                 "level TEXT NOT NULL, source TEXT NOT NULL, message TEXT NOT NULL)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_events_level_id ON events(level, id)")
-    conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)")
-    _local.connection, _local.path, _local.pid = conn, str(path), pid
-    return conn
+
+    # WAL setup and CREATE TABLE are writes, even when tables already exist.
+    # Serializing initial setup avoids races between web request threads.
+    # A retry also covers other processes starting at the same time.
+    with _connection_init_lock:
+        for attempt, delay in enumerate(_BUSY_RETRY_DELAYS):
+            if delay:
+                time.sleep(delay)
+            conn = None
+            try:
+                conn = sqlite3.connect(str(path), timeout=2, isolation_level=None)
+                conn.execute("PRAGMA busy_timeout=2000")
+                conn.execute("PRAGMA journal_mode=WAL")
+                conn.execute("CREATE TABLE IF NOT EXISTS events ("
+                             "id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, "
+                             "level TEXT NOT NULL, source TEXT NOT NULL, message TEXT NOT NULL)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_events_level_id ON events(level, id)")
+                conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)")
+                _local.connection, _local.path, _local.pid = conn, str(path), pid
+                return conn
+            except (OSError, sqlite3.Error) as exc:
+                if conn is not None:
+                    conn.close()
+                if (not isinstance(exc, sqlite3.OperationalError)
+                        or not _is_busy(exc) or attempt == len(_BUSY_RETRY_DELAYS) - 1):
+                    raise
+    raise RuntimeError("Could not initialize logging database")
 
 
 def append(message: str, *, level: str | None = None, source: str | None = None) -> None:
@@ -109,6 +136,7 @@ def append(message: str, *, level: str | None = None, source: str | None = None)
     severity = (level or classify(cleaned)).upper()
     if severity not in _LEVELS:
         severity = "INFO"
+    key = None
     try:
         if severity in ("WARNING", "ERROR"):
             now = time.monotonic()
@@ -120,20 +148,39 @@ def append(message: str, *, level: str | None = None, source: str | None = None)
                 if len(_recent_issues) > 500:
                     _recent_issues.clear()
                     _recent_issues[key] = now
-        conn = _connection()
-        conn.execute(
-            "INSERT INTO events(timestamp, level, source, message) VALUES (?, ?, ?, ?)",
-            (time.time(), severity, (source or _source)[:50], cleaned),
-        )
+
+        # An occasional SQLITE_BUSY must not silently lose an event.
+        for attempt, delay in enumerate(_BUSY_RETRY_DELAYS):
+            if delay:
+                time.sleep(delay)
+            try:
+                conn = _connection()
+                conn.execute(
+                    "INSERT INTO events(timestamp, level, source, message) VALUES (?, ?, ?, ?)",
+                    (time.time(), severity, (source or _source)[:50], cleaned),
+                )
+                break
+            except sqlite3.OperationalError as exc:
+                if not _is_busy(exc) or attempt == len(_BUSY_RETRY_DELAYS) - 1:
+                    raise
+
         count = getattr(_local, "count", 0) + 1
         _local.count = count
         if count % 100 == 0:
-            conn.execute(
-                "DELETE FROM events WHERE id <= "
-                "(SELECT COALESCE(MAX(id), 0) - ? FROM events)", (MAX_EVENTS,)
-            )
+            try:
+                conn.execute(
+                    "DELETE FROM events WHERE id <= "
+                    "(SELECT COALESCE(MAX(id), 0) - ? FROM events)", (MAX_EVENTS,)
+                )
+            except sqlite3.OperationalError:
+                # Pruning is housekeeping; the log entry has already been saved.
+                pass
     except (OSError, sqlite3.Error):
-        pass
+        if key is not None:
+            # A failed write must not suppress the same issue for 60 seconds.
+            with _recent_lock:
+                if _recent_issues.get(key) == now:
+                    _recent_issues.pop(key, None)
 
 
 def trace(message: str, *, source: str | None = None) -> None:
