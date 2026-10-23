@@ -5,10 +5,11 @@ import secrets
 from datetime import timedelta
 
 from dotenv import load_dotenv
-from flask import Flask, g, session
+from flask import Flask, g, request, session, got_request_exception
 
 from vinylpi.core.storage import initialize_storage
 from vinylpi.paths import BASE_DIR, DATA_DIR
+from vinylpi.logging_service import append, capture_exception
 from vinylpi.profiles import (
     get_profile_storage_override,
     profile_exists,
@@ -20,6 +21,7 @@ from vinylpi.web.routes.discogs_api import discogs_bp
 from vinylpi.web.routes.events_api import events_bp
 from vinylpi.web.routes.genius_api import genius_bp
 from vinylpi.web.routes.ha_api import bp as ha_api_bp
+from vinylpi.web.routes.logs_api import logs_bp
 from vinylpi.web.routes.pages import pages_bp
 from vinylpi.web.routes.pixoo_api import pixoo_bp
 from vinylpi.web.routes.profiles_api import profiles_bp
@@ -50,6 +52,7 @@ _BLUEPRINTS = (
     genius_bp,
     ha_api_bp,
     shazam_bp,
+    logs_bp,
 )
 
 
@@ -117,6 +120,19 @@ def create_app() -> Flask:
     def _release_browser_profile(_exc=None) -> None:
         if hasattr(g, "_vinylpi_previous_profile_override"):
             restore_profile_storage_override(g._vinylpi_previous_profile_override)
+
+    # Log actual server faults, not routine API access lines or expected 404s.
+    @app.after_request
+    def _log_server_error(response):
+        if response.status_code >= 500 and request.path.startswith("/api/"):
+            append(f"{request.method} {request.path} returned HTTP {response.status_code}",
+                   level="ERROR", source="Web API")
+        return response
+
+    def _log_unhandled_exception(_sender, exception, **_kwargs):
+        capture_exception(exception, source="Web API")
+
+    got_request_exception.connect(_log_unhandled_exception, app, weak=False)
 
     for blueprint in _BLUEPRINTS:
         app.register_blueprint(blueprint)

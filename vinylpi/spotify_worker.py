@@ -206,4 +206,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    from vinylpi.logging_service import install_print_capture
+    install_print_capture("Spotify")
     main()

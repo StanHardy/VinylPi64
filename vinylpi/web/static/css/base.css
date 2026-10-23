@@ -1277,3 +1277,20 @@ body.profile-dialog-open { overflow: hidden; }
         flex: 1 1 0;
     }
 }
+
+/* Logs navigation badge + About logo shortcut. */
+.nav-icon { position: relative; }
+.header-logo-link { display: inline-flex; border-radius: 18px; flex: 0 0 auto; text-decoration: none; }
+.header-logo-link:hover .header-logo { border-color: rgba(239,45,143,.65); }
+.header-logo-link:focus-visible { outline: 2px solid var(--pink); outline-offset: 3px; }
+.logs-unread-badge {
+    position: absolute; top: -6px; right: -9px; min-width: 18px; height: 18px;
+    padding: 0 4px; display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 12px; border: 2px solid #15151a; color: white;
+    background: #db3857; font: 800 10px/1 Inter, system-ui, sans-serif;
+}
+.logs-unread-badge[hidden] { display: none; }
+@media(max-width:800px) {
+  .logs-unread-badge { top:-7px; right:-12px; }
+  .header-logo-link { border-radius: 15px; }
+}

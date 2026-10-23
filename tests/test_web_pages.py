@@ -31,6 +31,7 @@ class WebPageStructureTests(unittest.TestCase):
             "/pixoo.html": "Pixoo",
             "/stats.html": "Statistics",
             "/about.html": "About",
+            "/logs.html": "Logs",
         }
 
         for route, heading in pages.items():
@@ -43,6 +44,9 @@ class WebPageStructureTests(unittest.TestCase):
     def test_page_specific_assets_are_served_from_static_tree(self):
         assets = (
             "/static/css/base.css",
+            "/static/css/pages/logs.css",
+            "/static/js/pages/logs.js",
+            "/static/js/logs_nav.js",
             "/static/css/pages/dashboard.css",
             "/static/js/pages/dashboard.js",
             "/static/js/pages/random_record.js",
@@ -63,6 +67,9 @@ class WebPageStructureTests(unittest.TestCase):
 
         self.assertIn('href="/settings.html" class="active" aria-current="page"', html)
         self.assertNotIn('href="/" class="nav-center active"', html)
+        self.assertIn('href="/logs.html"', html)
+        self.assertNotIn('class="nav-label">About</span>', html)
+        self.assertIn('href="/about.html" aria-label="About VinylPi64"', html)
 
 
     def test_lyrics_expand_button_is_rendered_below_lyrics_content(self):

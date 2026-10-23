@@ -9,6 +9,9 @@ data/status.json
 data/vinylpi.db
 data/vinylpi.db-wal
 data/vinylpi.db-shm
+data/logs.db
+data/logs.db-wal
+data/logs.db-shm
 
 .env
 vinylpi.env

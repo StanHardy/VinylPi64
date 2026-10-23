@@ -21,6 +21,11 @@ def stats_page():
     return render_template("pages/stats.html", active_page="stats")
 
 
+@pages_bp.get("/logs.html")
+def logs_page():
+    return render_template("pages/logs.html", active_page="logs")
+
+
 @pages_bp.get("/about.html")
 def about_page():
     return render_template("pages/about.html", active_page="about")
