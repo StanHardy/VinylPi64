@@ -3,7 +3,7 @@
 {% block title %}About – VinylPi64{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/about.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/about.css') }}?v=20261023-version">
 {% endblock %}
 
 {% block content %}
@@ -14,6 +14,20 @@
     </header>
 
     <section class="about-section">
+        <div class="card about-version-card" aria-label="Installed VinylPi version">
+            <div class="about-version-main">
+                <div>
+                    <span class="about-version-eyebrow">Installed version</span>
+                    <div class="about-version-number">{{ version_info.display }}</div>
+                </div>
+                <span class="about-version-status">{{ version_info.status }}</span>
+            </div>
+            <p class="about-version-detail">{{ version_info.detail }}</p>
+            <div class="about-version-links">
+                {% if version_info.tag_url %}<a href="{{ version_info.tag_url }}" target="_blank" rel="noopener noreferrer">GitHub tag {{ version_info.tag }}</a>{% endif %}
+                {% if version_info.commit_url %}<a href="{{ version_info.commit_url }}" target="_blank" rel="noopener noreferrer">Commit {{ version_info.commit }}</a>{% endif %}
+            </div>
+        </div>
         <div class="about-grid">
             <div class="card about-compact-card">
                 <h2>Author</h2>

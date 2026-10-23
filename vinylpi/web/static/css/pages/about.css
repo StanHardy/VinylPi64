@@ -67,3 +67,65 @@
 }
 
 .about-lead strong { color: var(--text); }
+
+/* Installed source version – neutral, without decorative gradients. */
+.about-version-card {
+    margin-bottom: 18px;
+    padding: 20px 22px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.about-version-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+}
+
+.about-version-eyebrow {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.about-version-number {
+    color: var(--text);
+    font-size: clamp(16px, 2.3vw, 22px);
+    font-weight: 750;
+    overflow-wrap: anywhere;
+}
+
+.about-version-status {
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    border-radius: 9px;
+    padding: 6px 10px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.about-version-detail {
+    margin: 9px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.about-version-links {
+    display: flex;
+    gap: 8px 18px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.about-version-links a {
+    color: var(--text);
+    font-size: 12px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}

@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, send_file
 
 from vinylpi.paths import BASE_DIR
+from vinylpi.version import get_version_info
 
 pages_bp = Blueprint("pages", __name__)
 
@@ -28,7 +29,7 @@ def logs_page():
 
 @pages_bp.get("/about.html")
 def about_page():
-    return render_template("pages/about.html", active_page="about")
+    return render_template("pages/about.html", active_page="about", version_info=get_version_info())
 
 
 @pages_bp.get("/pixoo.html")
