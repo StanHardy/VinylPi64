@@ -40,6 +40,23 @@ class LogsApiTests(unittest.TestCase):
         after = all_events['entries'][1]['id']
         self.assertEqual(self.client.get(f'/api/logs/summary?since={after}').get_json()['unread'], 1)
 
+    def test_clear_then_refresh_and_revisit_history(self):
+        logs.append('Before clear: warning', level='WARNING', source='Test')
+        logs.append('Before clear: trace', level='TRACE', source='Test')
+        stored = self.client.get('/api/logs?level=all').get_json()['entries']
+        self.assertEqual(len(stored), 2)
+        response = self.client.post('/api/logs/clear')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()['cleared_through'], stored[-1]['id'])
+        # A new page load uses after=0 but still cannot show acknowledged entries.
+        self.assertEqual(self.client.get('/api/logs?level=all').get_json()['entries'], [])
+        self.assertEqual(self.client.get('/api/logs/summary').get_json()['unread'], 0)
+        self.assertEqual(self.client.get('/api/logs?level=all&history=1').get_json()['entries'], stored)
+        logs.append('After clear: error', level='ERROR', source='Test')
+        self.assertEqual([e['message'] for e in self.client.get('/api/logs?level=all').get_json()['entries']],
+                         ['After clear: error'])
+        self.assertEqual(self.client.get('/api/logs/summary').get_json()['unread'], 1)
+
     def test_reject_unknown_filter(self):
         self.assertEqual(self.client.get('/api/logs?level=foo').status_code, 400)
 

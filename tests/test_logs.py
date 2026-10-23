@@ -42,6 +42,38 @@ class LogsTests(unittest.TestCase):
         })
         self.assertEqual(logs.summary(since=all_rows[-2]['id'])['unread'], 1)
 
+    def test_clear_is_persistent_but_history_is_preserved(self):
+        logs.append('old warning - 1', level='WARNING', source='Test')
+        logs.append('old trace - 2', level='TRACE', source='Test')
+        saved = logs.read_events(level='all')
+        cutoff = logs.clear_view()
+        self.assertEqual(cutoff, saved[-1]['id'])
+        self.assertEqual(logs.cleared_through(), cutoff)
+        self.assertEqual(logs.read_events(level='all', include_cleared=False), [])
+        self.assertEqual(logs.read_events(level='all'), saved)
+        self.assertEqual(logs.summary()['unread'], 0)
+        self.assertEqual(logs.clear_view(), cutoff)  # Repeated clear is harmless.
+        logs.append('new warning - 3', level='WARNING', source='Test')
+        self.assertEqual([e['message'] for e in logs.read_events(level='all', include_cleared=False)],
+                         ['new warning - 3'])
+        self.assertEqual(logs.summary()['unread'], 1)
+        # State survives SQLite connection recreation (e.g. web-app restart).
+        old_conn = getattr(logs._local, 'connection', None)
+        if old_conn is not None:
+            old_conn.close()
+        logs._local.connection = None
+        self.assertEqual(logs.cleared_through(), cutoff)
+        self.assertEqual(len(logs.read_events(level='all', include_cleared=False)), 1)
+
+    def test_clear_and_new_messages_are_thread_safe(self):
+        logs.append('existing event', level='INFO')
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            cutoffs = list(pool.map(lambda _: logs.clear_view(), range(6)))
+        self.assertEqual(len(set(cutoffs)), 1)
+        logs.append('message after clear', level='INFO')
+        self.assertEqual([e['message'] for e in logs.read_events(level='all', include_cleared=False)],
+                         ['message after clear'])
+
     def test_duplicate_error_is_throttled_but_normal_trace_is_not(self):
         logs.append('Unique API error: code z9', source='Spotify')
         logs.append('Unique API error: code z9', source='Spotify')

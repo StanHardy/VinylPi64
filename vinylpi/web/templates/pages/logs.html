@@ -1,10 +1,10 @@
 {% extends "layouts/base.html" %}
 {% block title %}Logs – VinylPi64{% endblock %}
 {% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/logs.css') }}?v=20261022-logs">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/logs.css') }}?v=20261023-logs-prefs">
 {% endblock %}
 {% block page_scripts %}
-<script src="{{ url_for('static', filename='js/pages/logs.js') }}?v=20261022-logs" defer></script>
+<script src="{{ url_for('static', filename='js/pages/logs.js') }}?v=20261023-logs-prefs" defer></script>
 {% endblock %}
 {% block content %}
 <main class="main">
@@ -47,14 +47,15 @@
                 <div class="logs-action-buttons">
                     <button id="logsToggleLive" type="button" aria-pressed="true" title="Pause or resume updates">Pause live</button>
                     <button id="logsCopy" type="button" title="Copy visible entries">Copy</button>
-                    <button id="logsClear" type="button" title="Clear the current view (saved logs are kept)">Clear view</button>
+                    <button id="logsHistory" type="button" aria-pressed="false" title="Show older messages kept in the local database">Show history</button>
+                    <button id="logsClear" type="button" title="Hide all current messages (saved logs are kept)">Clear view</button>
                 </div>
             </div>
             <div class="logs-stream" id="logsStream" role="log" aria-label="Recent log messages" aria-live="off">
                 <div class="logs-empty">Loading messages…</div>
             </div>
             <p id="logsFeedback" class="logs-feedback" role="status" aria-live="polite"></p>
-            <p class="logs-footnote">Stored locally on this device (latest 10,000 messages). HTTP access requests are excluded. Clearing the view does not delete stored history.</p>
+            <p class="logs-footnote">Stored locally on this device (latest 10,000 messages). HTTP access requests are excluded. Clear view stays cleared across refreshes and devices. Show history restores access to older entries without deleting them.</p>
         </section>
     </section>
 </main>

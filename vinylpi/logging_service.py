@@ -94,6 +94,7 @@ def _connection() -> sqlite3.Connection:
                  "id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp REAL NOT NULL, "
                  "level TEXT NOT NULL, source TEXT NOT NULL, message TEXT NOT NULL)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_events_level_id ON events(level, id)")
+    conn.execute("CREATE TABLE IF NOT EXISTS ui_state (key TEXT PRIMARY KEY, value INTEGER NOT NULL)")
     _local.connection, _local.path, _local.pid = conn, str(path), pid
     return conn
 
@@ -219,7 +220,42 @@ def install_print_capture(source: str) -> None:
         threading.excepthook = thread_hook
 
 
-def read_events(*, after: int = 0, limit: int = 200, level: str = "issues", search: str = "") -> list[dict]:
+def cleared_through() -> int:
+    """The last log ID acknowledged with Clear view, without deleting any event."""
+    try:
+        row = _connection().execute(
+            "SELECT value FROM ui_state WHERE key = 'cleared_through'"
+        ).fetchone()
+        return max(0, int(row[0])) if row else 0
+    except (sqlite3.Error, OSError):
+        return 0
+
+
+def clear_view() -> int:
+    """Atomically acknowledge all messages that exist at the time of clearing.
+
+    The transaction coordinates with concurrent log writers, so a newly arriving
+    message is never inadvertently hidden by an out-of-order watermark update.
+    Stored events are not removed and can still be viewed as history.
+    """
+    conn = _connection()
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        latest = int(conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0])
+        conn.execute(
+            "INSERT INTO ui_state (key, value) VALUES ('cleared_through', ?) "
+            "ON CONFLICT(key) DO UPDATE SET value = MAX(value, excluded.value)",
+            (latest,),
+        )
+        conn.execute("COMMIT")
+        return latest
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+
+
+def read_events(*, after: int = 0, limit: int = 200, level: str = "issues",
+                search: str = "", include_cleared: bool = True) -> list[dict]:
     limit = max(1, min(int(limit), 300))
     after = max(0, int(after))
     where = []
@@ -227,6 +263,13 @@ def read_events(*, after: int = 0, limit: int = 200, level: str = "issues", sear
     if after:
         where.append("id > ?")
         params.append(after)
+    if not include_cleared:
+        # Use a separate condition instead of replacing `after`: on initial
+        # load (after=0) results must still be newest-first then reversed.
+        watermark = cleared_through()
+        if watermark:
+            where.append("id > ?")
+            params.append(watermark)
     levels = {
         "issues": ("WARNING", "ERROR"),
         "errors": ("ERROR",),
@@ -259,9 +302,12 @@ def summary(since: int = 0) -> dict:
     try:
         conn = _connection()
         latest = conn.execute("SELECT COALESCE(MAX(id), 0) FROM events").fetchone()[0]
+        # Clearing the UI also acknowledges old warnings for the nav badge.
+        watermark = cleared_through()
         rows = conn.execute(
             "SELECT level, COUNT(*) FROM events WHERE id > ? "
-            "AND level IN ('WARNING', 'ERROR') GROUP BY level", (max(0, int(since)),),
+            "AND level IN ('WARNING', 'ERROR') GROUP BY level",
+            (max(0, int(since), watermark),),
         ).fetchall()
     except (sqlite3.Error, OSError):
         return {"latest_id": 0, "unread": 0, "warnings": 0, "errors": 0}

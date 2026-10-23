@@ -1,7 +1,9 @@
 """Bounded, read-only diagnostics API (no journalctl or shell access)."""
+import sqlite3
+
 from flask import Blueprint, jsonify, request
 
-from vinylpi.logging_service import read_events, summary
+from vinylpi.logging_service import clear_view, read_events, summary
 
 logs_bp = Blueprint("logs_api", __name__)
 
@@ -21,7 +23,8 @@ def api_logs():
     if level not in {"issues", "errors", "warnings", "trace", "all"}:
         return jsonify({"ok": False, "error": "invalid level"}), 400
     entries = read_events(after=after, limit=max(limit, 1), level=level,
-                          search=request.args.get("search", ""))
+                          search=request.args.get("search", ""),
+                          include_cleared=request.args.get("history") == "1")
     return jsonify({"ok": True, "entries": entries})
 
 
@@ -29,3 +32,13 @@ def api_logs():
 def api_logs_summary():
     since = _bounded_int(request.args.get("since"), 0, 2**63 - 1)
     return jsonify({"ok": True, **summary(since=since)})
+
+
+@logs_bp.post("/api/logs/clear")
+def api_logs_clear():
+    """Clear the live view, never the persisted logs."""
+    try:
+        cutoff = clear_view()
+    except (OSError, sqlite3.Error):
+        return jsonify({"ok": False, "error": "Could not save cleared state"}), 503
+    return jsonify({"ok": True, "cleared_through": cutoff})

@@ -10,11 +10,23 @@
     const feedback = document.getElementById('logsFeedback');
     const copy = document.getElementById('logsCopy');
     const clear = document.getElementById('logsClear');
+    const history = document.getElementById('logsHistory');
     const newBadge = document.getElementById('logsNew');
     const verbose = document.getElementById('logsVerbose');
     const verboseHelp = document.getElementById('logsVerboseHelp');
     const LIMIT = 200;
     const MAX_VISIBLE = 350;
+    const LEVEL_KEY = 'vinylpi.logs.level';
+    const validLevels = new Set(['issues', 'all', 'errors', 'warnings', 'trace']);
+    try {
+        const saved = localStorage.getItem(LEVEL_KEY);
+        if (validLevels.has(saved)) level.value = saved;
+    } catch { /* Private browsing may disable storage. */ }
+    function saveLevel() {
+        try { localStorage.setItem(LEVEL_KEY, level.value); }
+        catch { /* Browsing without storage remains supported. */ }
+    }
+    let showHistory = false;
     let entries = [];
     let cursor = 0;
     let live = true;
@@ -60,7 +72,7 @@
     }
     function renderAll() {
         if (!entries.length) {
-            placeholder('No messages match this filter.');
+            placeholder(showHistory ? 'No saved messages match this filter.' : 'No new messages match this filter. Use Show history to see older messages.');
         } else {
             const fragment = document.createDocumentFragment();
             entries.forEach(item => fragment.append(entryNode(item)));
@@ -100,6 +112,7 @@
             search: search.value.trim(),
             limit: String(LIMIT),
             after: String(after),
+            history: showHistory ? '1' : '0',
         });
         const response = await fetch(`/api/logs?${params}`, { cache: 'no-store' });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -165,23 +178,47 @@
             setConnection('Paused');
         }
     });
-    level.addEventListener('change', restart);
+    level.addEventListener('change', () => { saveLevel(); restart(); });
     search.addEventListener('input', () => {
         clearTimeout(searchTimer);
         searchTimer = setTimeout(restart, 280);
     });
-    clear.addEventListener('click', () => {
+    function setHistory(value) {
+        showHistory = value;
+        history.textContent = showHistory ? 'Hide history' : 'Show history';
+        history.setAttribute('aria-pressed', String(showHistory));
+    }
+    history.addEventListener('click', () => {
+        setHistory(!showHistory);
+        feedback.textContent = showHistory
+            ? 'Viewing saved history, including previously cleared messages.'
+            : '';
+        restart();
+    });
+    clear.addEventListener('click', async () => {
+        // Invalidate any outstanding polling request before clearing.
         generation++;
-        entries = [];
-        // Keep position: only messages arriving after clear appear on screen.
-        placeholder('View cleared. New messages will appear here.');
-        displayCount();
-        feedback.textContent = 'Only the view was cleared; saved history remains available.';
-        // Preserve the cursor; if no entries were displayed, obtain the latest ID.
-        if (!cursor) {
-            fetch('/api/logs/summary', { cache: 'no-store' }).then(r => r.json()).then(data => {
-                cursor = Math.max(cursor, data.latest_id || 0);
-            }).catch(() => {});
+        clear.disabled = true;
+        try {
+            const response = await fetch('/api/logs/clear', { method: 'POST', cache: 'no-store' });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const result = await response.json();
+            if (!result.ok || !Number.isSafeInteger(result.cleared_through)) {
+                throw new Error('Unexpected response');
+            }
+            setHistory(false);
+            entries = [];
+            cursor = result.cleared_through;
+            newBelow = 0;
+            placeholder('View cleared. New messages will appear here.');
+            displayCount();
+            feedback.textContent = 'Cleared view saved. Older messages are still available via Show history.';
+        } catch (e) {
+            feedback.textContent = `Could not clear view: ${e.message}`;
+            // Reload, rather than incorrectly claiming old messages were cleared.
+            restart();
+        } finally {
+            clear.disabled = false;
         }
     });
     copy.addEventListener('click', async () => {
@@ -225,6 +262,7 @@
             verboseHelp.textContent = enabled ? 'Detailed messages enabled.' : 'Detailed messages disabled; warnings/errors are still captured.';
             if (enabled && level.value === 'issues') {
                 level.value = 'all';
+                saveLevel();
                 restart();
             }
         } catch (e) {
