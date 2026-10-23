@@ -5,7 +5,6 @@ from vinylpi.integrations.pixoo_discovery import discover_pixoo_devices, _device
 from vinylpi.integrations.divoom_api import PixooError
 from vinylpi.web.services import pixoo
 from vinylpi.web.services.config import read_config, write_config
-from vinylpi.config.config_loader import CONFIG_DEFAULTS
 
 pixoo_bp = Blueprint("pixoo_api", __name__)
 
@@ -86,23 +85,18 @@ def api_pixoo_discover_and_save():
     except PixooError as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-    try:
-        cfg = read_config()
-    except Exception:
-        cfg = CONFIG_DEFAULTS
-
-    divoom_cfg = cfg.get("divoom") or {}
+    # Send only updated fields. Writing back a snapshot of the entire config
+    # can overwrite changes made by another request (e.g. selected stop GIF).
+    divoom_update = {}
     if dev.get("device_private_ip"):
-        divoom_cfg["ip"] = dev["device_private_ip"]
+        divoom_update["ip"] = dev["device_private_ip"]
     if dev.get("device_id") is not None:
-        divoom_cfg["device_id"] = dev["device_id"]
+        divoom_update["device_id"] = dev["device_id"]
     if dev.get("device_mac"):
-        divoom_cfg["device_mac"] = dev["device_mac"]
+        divoom_update["device_mac"] = dev["device_mac"]
 
-    cfg["divoom"] = divoom_cfg
-    write_config(cfg)
-
-    return jsonify({"ok": True, "device": dev, "divoom": divoom_cfg})
+    cfg = write_config({"divoom": divoom_update}) if divoom_update else read_config()
+    return jsonify({"ok": True, "device": dev, "divoom": cfg.get("divoom", {})})
 
 
 @pixoo_bp.post("/api/pixoo/scan")
