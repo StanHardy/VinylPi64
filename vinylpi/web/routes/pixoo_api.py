@@ -1,4 +1,7 @@
 from flask import Blueprint, jsonify, request
+import ipaddress
+
+from vinylpi.integrations.pixoo_discovery import discover_pixoo_devices, _device_info
 from vinylpi.integrations.divoom_api import PixooError
 from vinylpi.web.services import pixoo
 from vinylpi.web.services.config import read_config, write_config
@@ -100,3 +103,38 @@ def api_pixoo_discover_and_save():
     write_config(cfg)
 
     return jsonify({"ok": True, "device": dev, "divoom": divoom_cfg})
+
+
+@pixoo_bp.post("/api/pixoo/scan")
+def api_pixoo_scan():
+    """An explicitly requested local network scan; does not change settings."""
+    data = request.get_json(silent=True) or {}
+    try:
+        prefix = data.get("subnet_prefix")
+        devices = discover_pixoo_devices(manual=True, subnet_prefix=prefix)
+    except (ValueError, TypeError) as exc:
+        return jsonify({"ok": False, "error": str(exc)}), 400
+    return jsonify({"ok": True, "devices": devices})
+
+
+@pixoo_bp.post("/api/pixoo/select")
+def api_pixoo_select():
+    """Save a user-selected Pixoo IP to the current profile immediately."""
+    data = request.get_json(silent=True) or {}
+    ip = data.get("ip")
+    if not isinstance(ip, str):
+        return jsonify({"ok": False, "error": "ip must be a string"}), 400
+    ip = ip.strip()
+    if ip:
+        try:
+            address = ipaddress.ip_address(ip)
+            if address.version != 4 or not (address.is_private or address.is_link_local):
+                raise ValueError("Not a private IPv4 address")
+        except ValueError:
+            return jsonify({"ok": False, "error": "Invalid local Pixoo IPv4 address"}), 400
+        timeout = max(0.1, min(5.0, float((read_config().get("divoom") or {}).get("timeout", 2.0))))
+        if _device_info(ip, timeout) is None:
+            return jsonify({"ok": False, "error": "The selected IP did not respond as a Pixoo"}), 422
+
+    write_config({"divoom": {"ip": ip}})
+    return jsonify({"ok": True, "ip": ip})

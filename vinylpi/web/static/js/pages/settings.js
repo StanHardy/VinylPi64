@@ -123,6 +123,110 @@ async function loadAudioDevices(configuredName = null, { announce = false } = {}
     }
 }
 
+// The Pixoo is not probed when Settings loads. Only the selected/saved IP is
+// displayed; explicit scans enumerate the configured local /24 subnet.
+let pixooDiscoveredDevices = [];
+let pixooSelectionBusy = false;
+
+function setPixooDeviceStatus(message = "", isError = false) {
+    const target = document.getElementById("pixooDeviceStatus");
+    if (!target) return;
+    target.textContent = message;
+    target.hidden = !message;
+    target.style.color = isError ? "#f87171" : "";
+}
+
+function populatePixooDeviceSelect(savedIp = "", devices = []) {
+    const select = document.getElementById("divoomIp");
+    if (!select) return;
+    const saved = String(savedIp || "").trim();
+    const byIp = new Map();
+    devices.forEach((device) => {
+        if (device && device.ip) byIp.set(String(device.ip), device);
+    });
+    select.replaceChildren(new Option("Automatic discovery", ""));
+    if (saved && !byIp.has(saved)) {
+        select.add(new Option(`Saved Pixoo · ${saved}`, saved));
+    }
+    for (const device of byIp.values()) {
+        select.add(new Option(`${device.name || "Pixoo"} · ${device.ip}`, device.ip));
+    }
+    select.value = saved;
+}
+
+async function selectPixooDevice(ip, { announce = true } = {}) {
+    const select = document.getElementById("divoomIp");
+    if (!select || pixooSelectionBusy) return false;
+    const previous = String(CURRENT_CFG?.divoom?.ip || "");
+    pixooSelectionBusy = true;
+    select.disabled = true;
+    setPixooDeviceStatus("Saving Pixoo selection…");
+    try {
+        const response = await fetch("/api/pixoo/select", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || "Could not save Pixoo selection");
+        if (CURRENT_CFG) {
+            CURRENT_CFG.divoom = CURRENT_CFG.divoom || {};
+            CURRENT_CFG.divoom.ip = data.ip || "";
+        }
+        select.value = data.ip || "";
+        setPixooDeviceStatus(data.ip ? `Saved: ${data.ip}` : "Automatic discovery enabled when needed.");
+        if (announce) showToast(data.ip ? "Pixoo device saved." : "Pixoo selection cleared.");
+        return true;
+    } catch (error) {
+        console.error(error);
+        select.value = previous;
+        setPixooDeviceStatus(error.message || "Could not save Pixoo selection.", true);
+        if (announce) showToast("Could not save Pixoo device.", true);
+        return false;
+    } finally {
+        select.disabled = false;
+        pixooSelectionBusy = false;
+    }
+}
+
+async function scanPixooDevices() {
+    const refresh = document.getElementById("scanPixooDevices");
+    const select = document.getElementById("divoomIp");
+    if (!refresh || !select || refresh.disabled) return;
+    const preferred = String(CURRENT_CFG?.divoom?.ip || "");
+    refresh.disabled = true;
+    setPixooDeviceStatus("Searching the local subnet for Pixoo devices…");
+    try {
+        const response = await fetch("/api/pixoo/scan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ subnet_prefix: document.getElementById("subnetPrefix")?.value.trim() }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || "Pixoo network scan failed");
+        pixooDiscoveredDevices = Array.isArray(data.devices) ? data.devices : [];
+        populatePixooDeviceSelect(preferred, pixooDiscoveredDevices);
+        if (pixooDiscoveredDevices.length === 1) {
+            const device = pixooDiscoveredDevices[0];
+            select.value = device.ip;
+            const saved = await selectPixooDevice(device.ip, { announce: false });
+            if (saved) {
+                setPixooDeviceStatus(`Found ${device.name || "Pixoo"} at ${device.ip}. Selection saved.`);
+                showToast("Pixoo found and saved.");
+            }
+        } else if (pixooDiscoveredDevices.length > 1) {
+            setPixooDeviceStatus(`${pixooDiscoveredDevices.length} Pixoo devices found. Choose one from the dropdown.`);
+        } else {
+            setPixooDeviceStatus("No Pixoo found. Check Wi-Fi, subnet prefix and device power.", true);
+        }
+    } catch (error) {
+        console.error(error);
+        setPixooDeviceStatus(error.message || "Pixoo network scan failed.", true);
+    } finally {
+        refresh.disabled = false;
+    }
+}
+
 function rgbToHex(arr) {
     const [r, g, b] = arr;
     return "#" + [r, g, b]
@@ -1019,6 +1123,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("refreshAudioDevices")?.addEventListener("click", () => {
     loadAudioDevices(null, { announce: true });
   });
+  document.getElementById("scanPixooDevices")?.addEventListener("click", scanPixooDevices);
+  document.getElementById("divoomIp")?.addEventListener("change", (event) => {
+    selectPixooDevice(event.target.value);
+  });
   document.getElementById("discogsConnect")?.addEventListener("click", connectDiscogs);
   document.getElementById("discogsSync")?.addEventListener("click", startDiscogsSync);
   syncDependentSettingStates();
@@ -1178,8 +1286,9 @@ async function loadConfig() {
         fallback.allowed_failures ?? 3;
 
     // DIVOOM / PIXOO
-    document.getElementById("divoomIp").value =
-        divoom.ip || "";
+    pixooDiscoveredDevices = [];
+    populatePixooDeviceSelect(divoom.ip || "");
+    setPixooDeviceStatus();
     document.getElementById("divoomDeviceName").value =
         divoom.device_name || "";
     document.getElementById("divoomDeviceID").value = 

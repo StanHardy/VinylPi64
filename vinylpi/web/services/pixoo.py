@@ -105,4 +105,4 @@ def play_remote_gif(file_id: str):
 
 
 def discover_cloud_device():
-    return PixooClient().discover_cloud_device()
+    return PixooClient(auto_discover=False).discover_cloud_device()

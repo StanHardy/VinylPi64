@@ -2290,3 +2290,8 @@ body.mobile-display-preview-open {
     border-top: 1px solid var(--border);
 }
 .pixoo-automations-group > .pixoo-automation-option:not(:last-child) .setting-group-header { margin-bottom: 0; }
+
+/* Explicit Pixoo device selection: reuse the audio-device dropdown layout. */
+.pixoo-device-hint { margin-top: 8px; line-height: 1.5; }
+#pixooDeviceStatus { margin-top: 8px; }
+#scanPixooDevices:disabled { cursor: progress; opacity: .55; }

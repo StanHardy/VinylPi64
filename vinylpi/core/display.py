@@ -24,7 +24,9 @@ _display_lock = threading.RLock()
 
 def _get_pixoo() -> PixooClient:
     global _pixoo_client
-    if _pixoo_client is None:
+    configured_ip = str((read_config().get("divoom") or {}).get("ip") or "").strip()
+    # Pick up an explicit device change without restarting the Vinyl worker.
+    if _pixoo_client is None or configured_ip != _pixoo_client.ip:
         _pixoo_client = PixooClient()
     return _pixoo_client
 

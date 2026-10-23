@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261022-pixoo-auto">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261023-pixoo-scan">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261022-pixoo-auto" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261023-pixoo-scan" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}" defer></script>
 {% endblock %}
 
@@ -410,7 +410,23 @@
                     <div class="settings-card-content">
                         <div class="form-group">
                             <div class="group-title">Device</div>
-                            <div class="form-row"><label for="divoomIp">Fixed IP</label><input type="text" id="divoomIp" placeholder="192.168.x.x"></div>
+                            <div class="form-row">
+                                <label for="divoomIp">Pixoo device</label>
+                                <div class="audio-device-control">
+                                    <select id="divoomIp" class="pixoo-select">
+                                        <option value="">Automatic discovery</option>
+                                    </select>
+                                    <button type="button" id="scanPixooDevices" class="audio-device-refresh"
+                                            aria-label="Search for Pixoo devices" title="Search local network for Pixoo devices">
+                                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                                            <circle cx="10.8" cy="10.8" r="6.3"></circle>
+                                            <path d="m15.5 15.5 5.2 5.2"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <div id="pixooDeviceStatus" class="form-hint" role="status" aria-live="polite" hidden></div>
+                                <div class="form-hint pixoo-device-hint">The selected IP is saved automatically for this profile. Reserving a fixed IP for your Pixoo in your router (DHCP reservation) prevents its address from changing.</div>
+                            </div>
                             <div class="form-row"><label for="divoomDeviceName">Device name</label><input type="text" id="divoomDeviceName" placeholder="espressif"></div>
                             <div class="form-row"><label for="divoomDeviceID">Device ID</label><input type="text" id="divoomDeviceID" placeholder="0"></div>
                             <div class="form-row"><label for="divoomDeviceMAC">Device MAC</label><input type="text" id="divoomDeviceMAC" placeholder=""></div>
@@ -419,7 +435,8 @@
                         </div>
 
                         <div class="form-group">
-                            <div class="group-title">Discovery</div>
+                            <div class="group-title">Automatic discovery (fallback)</div>
+                            <div class="form-hint pixoo-device-hint">When no IP is saved or the saved device becomes unreachable, VinylPi can search again. Automatic scans normally use the range below and are rate-limited (expanded if your saved IP lies outside it). The search button above checks the entire configured /24 subnet.</div>
                             <div class="form-row"><label for="discoveryEnabled">Auto discovery enabled</label><input type="checkbox" id="discoveryEnabled"></div>
                             <div data-setting-row="discovery-details">
                                 <div class="form-row"><label for="subnetPrefix">Subnet prefix</label><input type="text" id="subnetPrefix" placeholder="192.168.2."></div>

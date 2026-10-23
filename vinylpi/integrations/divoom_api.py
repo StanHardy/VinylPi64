@@ -8,7 +8,7 @@ import requests
 from PIL import Image
 
 from vinylpi.config.runtime import read_config, write_config
-from vinylpi.integrations.pixoo_discovery import discover_pixoo_ip, _probe_ip
+from vinylpi.integrations.pixoo_discovery import discover_pixoo_ip, _probe_ip  # Compatibility for existing integrations/tests
 
 from vinylpi.paths import CLOUD_BASE_URL
 
@@ -26,52 +26,28 @@ class PixooClient:
         self.gif_speed_ms = divoom_cfg.get("gif_speed_ms", 100)
         self.auto_reset_gif_id = divoom_cfg.get("auto_reset_gif_id", True)
 
-        cfg_ip = divoom_cfg.get("ip")
+        cfg_ip = str(divoom_cfg.get("ip") or "").strip()
+        self._auto_discover = bool(auto_discover)
+        self.ip = str(ip or cfg_ip).strip()
+        if not self.ip and self._auto_discover:
+            # First-time setup: discover only when there is no saved IP.
+            self.ip = self._discover_and_save(previous_ip="")
+        self.base_url = f"http://{self.ip}/post" if self.ip else ""
 
-        candidate_ip = ip or cfg_ip
-        if not auto_discover:
-            # Divoom cloud operations only need device ID/MAC; they must work
-            # even if the Pixoo has no reachable/configured LAN address.
-            self.ip = candidate_ip or ""
-            self.base_url = f"http://{self.ip}/post" if self.ip else ""
-            return
-
-        if candidate_ip:
-            if _probe_ip(candidate_ip, self.timeout):
-                self.ip = candidate_ip
-            else:
-                discovered = discover_pixoo_ip()
-                if not discovered:
-                    raise PixooError(
-                        "Configured Pixoo IP not reachable and discovery failed. "
-                        "Make sure that pixoo is in same WIFI and "
-                        "config.json -> divoom.discovery.subnet_prefix is correct."
-                    )
-                self.ip = discovered
-        else:
-            discovered = discover_pixoo_ip()
-            if not discovered:
-                raise PixooError(
-                    "No Pixoo IP configured and discovery failed. "
-                    "Make sure that pixoo is in same WIFI and "
-                    "config.json -> divoom.discovery.subnet_prefix is correct."
-                )
-            self.ip = discovered
-
-        if self.ip != cfg_ip:
-            CONFIG.setdefault("divoom", {})
-            CONFIG["divoom"]["ip"] = self.ip
-
+    def _discover_and_save(self, *, previous_ip: str) -> str:
+        discovered = discover_pixoo_ip()
+        if not discovered:
+            raise PixooError(
+                "Pixoo not reachable; no device found by automatic discovery "
+                "(or scan cooldown active). Check Settings > Pixoo & Network."
+            )
+        if discovered != previous_ip:
             try:
-                write_config({"divoom": {"ip": self.ip}})
-                if debug_log:
-                    print(f"Saved Pixoo IP to active profile config: {self.ip}")
-            except Exception as e:
-                print(f"Warning: could not save Pixoo IP to active profile config: {e}")
-
-        self.base_url = f"http://{self.ip}/post"
-        if debug_log:
-            print(f"PixooClient using IP: {self.ip}")
+                write_config({"divoom": {"ip": discovered}})
+                print(f"Pixoo IP discovered and saved: {discovered}")
+            except Exception as exc:
+                print(f"Warning: could not save Pixoo IP to config: {exc}")
+        return discovered
 
 
     def _cloud_post(self, path: str, payload: dict) -> dict:
@@ -127,19 +103,33 @@ class PixooClient:
         if not self.base_url:
             raise PixooError("Pixoo IP is not configured for local commands")
         try:
-            resp = requests.post(
-                self.base_url,
-                json=payload,
-                timeout=self.timeout,
-            )
+            resp = requests.post(self.base_url, json=payload, timeout=self.timeout)
             resp.raise_for_status()
-        except requests.RequestException as e:
-            raise PixooError(f"HTTP-Error on sending image to pixoo: {e}") from e
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            if not self._auto_discover:
+                raise PixooError(f"Pixoo at {self.ip} is not reachable: {exc}") from exc
+            # A *real* network failure is the fallback trigger. Never scan
+            # merely because a PixooClient was instantiated or polled.
+            old_ip = self.ip
+            try:
+                new_ip = self._discover_and_save(previous_ip=old_ip)
+            except PixooError as discovery_exc:
+                raise PixooError(f"Pixoo at {old_ip} is not reachable: {exc}; {discovery_exc}") from exc
+            self.ip = new_ip
+            self.base_url = f"http://{new_ip}/post"
+            try:
+                resp = requests.post(self.base_url, json=payload, timeout=self.timeout)
+                resp.raise_for_status()
+            except requests.RequestException as retry_exc:
+                raise PixooError(f"Pixoo request failed after discovery: {retry_exc}") from retry_exc
+        except requests.RequestException as exc:
+            # HTTP errors do not indicate that the address changed.
+            raise PixooError(f"HTTP error while contacting Pixoo: {exc}") from exc
 
         try:
             data = resp.json()
-        except json.JSONDecodeError:
-            return {}
+        except ValueError as exc:
+            raise PixooError("Invalid JSON from Pixoo local API") from exc
 
         if isinstance(data, dict) and data.get("error_code", 0) != 0:
             raise PixooError(f"Pixoo API error: {data!r}")
