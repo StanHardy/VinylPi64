@@ -82,6 +82,31 @@ class WebApiTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         set_brightness.assert_called_once_with(75)
 
+    @patch("vinylpi.web.routes.pixoo_api.pixoo.get_liked_gifs")
+    @patch("vinylpi.web.routes.pixoo_api.pixoo.get_selected_stop_gif", return_value="1234")
+    @patch("vinylpi.web.routes.pixoo_api.read_config", return_value={"divoom": {"device_id": 0, "device_mac": ""}})
+    def test_liked_gifs_unconfigured_profile_is_not_server_error(self, config, selected, get_likes):
+        response = self.client.get("/api/pixoo/liked-gifs")
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body["ok"])
+        self.assertTrue(body["needs_setup"])
+        self.assertEqual(body["gifs"], [])
+        self.assertEqual(body["selected_file_id"], "1234")
+        get_likes.assert_not_called()
+
+    @patch("vinylpi.web.routes.pixoo_api.pixoo.get_liked_gifs", return_value=([{"file_id": "9"}], True))
+    @patch("vinylpi.web.routes.pixoo_api.pixoo.get_selected_stop_gif", return_value="9")
+    @patch("vinylpi.web.routes.pixoo_api.read_config", return_value={"divoom": {"device_id": 123, "device_mac": "aa"}})
+    def test_liked_gifs_returns_cached_results_when_configured(self, config, selected, get_likes):
+        response = self.client.get("/api/pixoo/liked-gifs")
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        self.assertTrue(body["ok"])
+        self.assertFalse(body["needs_setup"])
+        self.assertEqual(body["gifs"], [{"file_id": "9"}])
+        get_likes.assert_called_once_with(page=1, refresh=False)
+
     def test_play_remote_requires_file_id(self):
         response = self.client.post("/api/pixoo/play-remote", json={})
 

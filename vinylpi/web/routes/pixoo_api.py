@@ -62,13 +62,21 @@ def api_pixoo_channel():
 
 @pixoo_bp.get("/api/pixoo/liked-gifs")
 def api_pixoo_liked_gifs():
+    device = (read_config().get("divoom") or {})
+    selected_id = pixoo.get_selected_stop_gif()
+    if not device.get("device_id") or not str(device.get("device_mac") or "").strip():
+        return jsonify({
+            "ok": True, "gifs": [], "cached": False,
+            "selected_file_id": selected_id, "needs_setup": True,
+        })
     try:
         refresh = request.args.get("refresh", "").lower() in {"1", "true", "yes"}
         gifs, cached = pixoo.get_liked_gifs(page=1, refresh=refresh)
         return jsonify({"ok": True, "gifs": gifs, "cached": cached,
-                        "selected_file_id": pixoo.get_selected_stop_gif()})
-    except PixooError as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+                        "selected_file_id": selected_id, "needs_setup": False})
+    except PixooError:
+        # A remote Divoom failure is a gateway issue, not a VinylPi internal error.
+        return jsonify({"ok": False, "error": "Could not load GIFs from Divoom. Try again later."}), 502
 
 @pixoo_bp.post("/api/pixoo/selected-gif")
 def api_selected_stop_gif():

@@ -84,6 +84,16 @@ class PixooAutomationsTests(unittest.TestCase):
                 self.assertFalse(cached)
                 self.assertEqual(client.return_value.get_liked_gifs.call_count, 2)
 
+    def test_missing_pixoo_identity_does_not_contact_divoom(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with patch.object(pixoo, "_CACHE_PATH", Path(folder) / "gifs.json"), \
+                 patch("vinylpi.web.services.pixoo.read_config", return_value={"divoom": {"device_id": 0, "device_mac": ""}}), \
+                 patch("vinylpi.web.services.pixoo.PixooClient") as client:
+                gifs, cached = pixoo.get_liked_gifs(refresh=True)
+                self.assertEqual(gifs, [])
+                self.assertFalse(cached)
+                client.assert_not_called()
+
     @patch("vinylpi.web.services.pixoo.write_config")
     def test_selected_gif_is_persisted_to_active_config(self, write_config):
         pixoo.set_selected_stop_gif(" 0123 ")

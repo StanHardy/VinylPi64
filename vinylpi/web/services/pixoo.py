@@ -74,6 +74,11 @@ def set_channel(channel: int):
 
 def get_liked_gifs(page: int = 1, *, refresh: bool = False) -> tuple[list[dict], bool]:
     """Return cached likes first; refresh only on demand or an empty cache."""
+    device = (read_config().get("divoom") or {})
+    if not device.get("device_id") or not str(device.get("device_mac") or "").strip():
+        # An unconfigured profile is a normal state, not a cloud/API error.
+        return [], False
+
     cached = _cached_likes()
     if cached is not None and not refresh:
         return cached, True

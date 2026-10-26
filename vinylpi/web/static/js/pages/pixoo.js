@@ -98,24 +98,9 @@ document.addEventListener("DOMContentLoaded", () => {
             discoverStatus.textContent =
                 `Found ${dev.device_name || "Pixoo"} at ${ip} (DeviceId ${id}) and saved to config.`;
 
-            if (typeof loadPixooStatus === "function") {
-                likesSelect?.addEventListener("change", async () => {
-        try {
-            const response = await fetch("/api/pixoo/selected-gif", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ file_id: likesSelect.value }),
-            });
-            if (!response.ok) throw new Error("Save failed");
-            likesStatus.textContent = "Selected GIF saved for the current VinylPi profile.";
-        } catch (error) {
-            console.error(error);
-            likesStatus.textContent = "Could not save GIF selection.";
-        }
-    });
-
-    loadPixooStatus();
-    loadLikedGifs();
-            }
+            // Discovery saves device details, but GIFs are loaded only on request.
+            await loadPixooStatus();
+            if (likesStatus) likesStatus.textContent = "Click Load liked GIFs to browse your Divoom likes.";
         } catch (err) {
             console.error("Error during discovery:", err);
             discoverStatus.textContent = "Error: " + err.message;
@@ -190,14 +175,22 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!likesStatus || !likesSelect) return;
 
         likesStatus.textContent = "Loading liked GIFs...";
-        likesSelect.innerHTML = `<option value="">Loading…</option>`;
+        const previousSelection = likesSelect.value;
 
         try {
             const res = await fetch(`/api/pixoo/liked-gifs${refresh ? "?refresh=1" : ""}`);
             const data = await res.json();
 
-            if (!data.ok) {
-                throw new Error(data.error || "Unknown error");
+            if (!res.ok || !data.ok) {
+                throw new Error(data.error || "Could not load liked GIFs");
+            }
+            if (data.needs_setup) {
+                const saved = String(data.selected_file_id || "");
+                likesSelect.replaceChildren(new Option("No GIF selected", ""));
+                if (saved) likesSelect.add(new Option(`Saved GIF (${saved})`, saved));
+                likesSelect.value = saved;
+                likesStatus.textContent = "Configure your Pixoo in Settings to browse community GIFs.";
+                return;
             }
 
             const gifs = data.gifs || [];
@@ -211,7 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            likesSelect.innerHTML = "";
+            likesSelect.replaceChildren(new Option("Select a GIF", ""));
             gifs.forEach(gif => {
                 const opt = document.createElement("option");
                 opt.value = gif.file_id;
@@ -220,14 +213,16 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             const remembered = String(data.selected_file_id || "");
-            if (remembered && Array.from(likesSelect.options).some(o => o.value === remembered)) {
-                likesSelect.value = remembered;
+            if (remembered && !Array.from(likesSelect.options).some(o => o.value === remembered)) {
+                likesSelect.add(new Option(`Saved GIF (${remembered})`, remembered));
             }
+            likesSelect.value = remembered;
             likesStatus.textContent = `${gifs.length} liked GIF(s) ${data.cached ? "from cache" : "loaded"}.`;
         } catch (err) {
             console.error("Error loading liked GIFs:", err);
-            likesSelect.replaceChildren(new Option("Could not load liked GIFs", ""));
-            likesStatus.textContent = "Could not load liked GIFs. Try refreshing.";
+            // Retain the current selection if a network request fails.
+            likesSelect.value = previousSelection;
+            likesStatus.textContent = "Could not load liked GIFs. Your selection is unchanged.";
         }
     }
 
@@ -324,5 +319,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     loadPixooStatus();
-    loadLikedGifs();
 });

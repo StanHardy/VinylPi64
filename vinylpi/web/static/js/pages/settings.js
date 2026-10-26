@@ -1140,31 +1140,60 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 
+let pixooGifLoaded = false;
+let pixooGifLoading = false;
+let pixooGifRequestVersion = 0;
+
+function setSavedPixooGif(selectedId = "") {
+    const select = document.getElementById("pixooStopGifSelect");
+    if (!select) return;
+    const savedId = String(selectedId || "");
+    select.replaceChildren(new Option("No GIF selected", ""));
+    if (savedId) select.add(new Option(`Saved GIF (${savedId})`, savedId));
+    select.value = savedId;
+}
+
 async function loadPixooAutomationGifs(selectedId = "", refresh = false) {
     const select = document.getElementById("pixooStopGifSelect");
     const status = document.getElementById("pixooStopGifStatus");
-    if (!select) return;
-    select.replaceChildren(new Option("Loading liked GIFs…", ""));
+    if (!select || pixooGifLoading) return;
+
+    const divoom = CURRENT_CFG?.divoom || {};
+    if (!divoom.device_id || !String(divoom.device_mac || "").trim()) {
+        if (status) status.textContent = "Configure your Pixoo in Settings to browse community GIFs.";
+        return;
+    }
+
+    const version = ++pixooGifRequestVersion;
+    const previousSelection = String(selectedId || select.value || "");
+    pixooGifLoading = true;
     if (status) status.textContent = "Loading liked GIFs…";
     try {
         const response = await fetch(`/api/pixoo/liked-gifs${refresh ? "?refresh=1" : ""}`);
         const data = await response.json();
+        if (version !== pixooGifRequestVersion) return;
         if (!response.ok || !data.ok) throw new Error(data.error || "Could not load GIFs");
+        if (data.needs_setup) {
+            if (status) status.textContent = "Configure your Pixoo to browse community GIFs.";
+            return;
+        }
         select.replaceChildren(new Option("No GIF selected", ""));
         for (const gif of (data.gifs || [])) {
             if (gif.file_id != null) select.add(new Option(gif.file_name || String(gif.file_id), String(gif.file_id)));
         }
-        // Preserve the configured selection even when that Divoom like disappeared.
-        if (selectedId && !Array.from(select.options).some(o => o.value === selectedId)) {
-            select.add(new Option(`Saved GIF (${selectedId})`, selectedId));
+        if (previousSelection && !Array.from(select.options).some(o => o.value === previousSelection)) {
+            select.add(new Option(`Saved GIF (${previousSelection})`, previousSelection));
         }
-        select.value = selectedId;
+        select.value = previousSelection;
+        pixooGifLoaded = true;
         if (status) status.textContent = `${(data.gifs || []).length} liked GIFs`;
     } catch (error) {
-        select.replaceChildren(new Option("No GIF selected", ""));
-        if (selectedId) select.add(new Option(`Saved GIF (${selectedId})`, selectedId));
-        select.value = selectedId;
-        if (status) status.textContent = "Could not load GIFs. Saved selection is still available.";
+        if (version !== pixooGifRequestVersion) return;
+        // Keep a saved selection when Divoom is unavailable.
+        setSavedPixooGif(previousSelection);
+        if (status) status.textContent = "Could not load GIFs. Your saved selection is unchanged.";
+    } finally {
+        if (version === pixooGifRequestVersion) pixooGifLoading = false;
     }
 }
 
@@ -1377,7 +1406,13 @@ async function loadConfig() {
         : pixooAutomations.play_gif_on_stop ? "community_gif" : "none";
     document.getElementById("pixooOffEnabled").checked = offAction !== "none";
     document.querySelector(`input[name="pixooOffAction"][value="${offAction === "brightness_off" ? "brightness_off" : "community_gif"}"]`).checked = true;
-    loadPixooAutomationGifs(String(pixooAutomations.stop_gif_file_id || ""));
+    // Preserve the selected GIF, but do not call Divoom on every page/profile load.
+    pixooGifRequestVersion++;
+    pixooGifLoaded = false;
+    pixooGifLoading = false;
+    setSavedPixooGif(String(pixooAutomations.stop_gif_file_id || ""));
+    const gifStatus = document.getElementById("pixooStopGifStatus");
+    if (gifStatus) gifStatus.textContent = "Select Community GIF to load available GIFs, or use Refresh.";
 
     // HOME ASSISTANT
     document.getElementById("useHA").checked =
@@ -1832,19 +1867,24 @@ function syncPixooAnimationMode() {
         : "Continuous frame updates; no initial GIF loading.";
 }
 
-function syncPixooOffAction() {
+function syncPixooOffAction({ loadGifs = false } = {}) {
     const enabled = Boolean(document.getElementById("pixooOffEnabled")?.checked);
     const action = document.querySelector('input[name="pixooOffAction"]:checked')?.value;
     const details = document.querySelector('[data-setting-row="pixoo-off-action-details"]');
     const gif = document.querySelector('[data-setting-row="pixoo-off-gif-details"]');
+    const showGif = enabled && action === "community_gif";
     if (details) details.hidden = !enabled;
-    if (gif) gif.hidden = !enabled || action !== "community_gif";
+    if (gif) gif.hidden = !showGif;
+    // Only an explicit user action may trigger the GIF catalog request.
+    if (loadGifs && showGif && !pixooGifLoaded && !pixooGifLoading) {
+        loadPixooAutomationGifs(document.getElementById("pixooStopGifSelect")?.value || "");
+    }
 }
 
 document.querySelectorAll('input[name="divoomAnimationMode"]').forEach(input => {
     input.addEventListener("change", syncPixooAnimationMode);
 });
-document.getElementById("pixooOffEnabled")?.addEventListener("change", syncPixooOffAction);
+document.getElementById("pixooOffEnabled")?.addEventListener("change", () => syncPixooOffAction({ loadGifs: true }));
 document.querySelectorAll('input[name="pixooOffAction"]').forEach(input => {
-    input.addEventListener("change", syncPixooOffAction);
+    input.addEventListener("change", () => syncPixooOffAction({ loadGifs: true }));
 });
