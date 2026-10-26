@@ -7,6 +7,9 @@ logger = logging.getLogger(__name__)
 import re
 from typing import Any
 
+from aiohttp import ClientError
+from requests.exceptions import RequestException
+
 from vinylpi.core.genre_tags import normalize_genre
 from vinylpi.core.image_utils import load_image
 from vinylpi.core.models import RecognizedTrack
@@ -149,8 +152,16 @@ def _recognize(wav_bytes: bytes) -> RecognizedTrack | None:
 
 
 def recognize_song(wav_bytes: bytes) -> RecognizedTrack | None:
+    """Recognize a sample; transient Shazam/network failures are not crashes."""
     try:
         return _recognize(wav_bytes)
-    except Exception as exc:
-        logger.exception(f"Error while detecting: {exc}")
-        return None
+    except TimeoutError:
+        # asyncio.wait_for() can chain several cancellation exceptions into a
+        # timeout. Don't expose that implementation detail in user-facing logs.
+        logger.warning("Shazam recognition timed out. Retrying with the next sample.")
+    except (ClientError, ConnectionError, RequestException):
+        logger.warning("Shazam recognition failed due to a network connection problem. Retrying.")
+    except Exception:
+        # Keep diagnostic tracebacks for genuinely unexpected code failures.
+        logger.exception("Unexpected error during song recognition")
+    return None
