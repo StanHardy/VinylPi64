@@ -3,12 +3,12 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261026-display-automation">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261026-settings-unified">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261026-display-automation" defer></script>
-    <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261025-logo" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261026-settings-unified" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261026-settings-unified" defer></script>
 {% endblock %}
 
 {% block content %}
@@ -486,11 +486,11 @@
                                 </div>
                                 <div data-setting-row="pixoo-off-action-details" hidden>
                                     <div class="form-row">
-                                        <label for="pixooOffAction">Action</label>
-                                        <select id="pixooOffAction">
-                                            <option value="community_gif">Play community GIF</option>
-                                            <option value="brightness_off">Turn off display (brightness 0%)</option>
-                                        </select>
+                                        <span class="cover-source-label" id="pixooOffActionLabel">Action</span>
+                                        <div class="cover-source-segmented" role="radiogroup" aria-labelledby="pixooOffActionLabel">
+                                            <label><input type="radio" name="pixooOffAction" value="community_gif" checked><span>Community GIF</span></label>
+                                            <label><input type="radio" name="pixooOffAction" value="brightness_off"><span>Turn off display</span></label>
+                                        </div>
                                     </div>
                                     <div data-setting-row="pixoo-off-gif-details" hidden>
                                         <div class="form-row pixoo-automation-gif-row">
@@ -530,11 +530,6 @@
 
                         <div class="form-group">
                             <div class="group-title">Account</div>
-                            <div class="discogs-env-card">
-                                <span>Token in <strong>vinylpi.env</strong></span>
-                                <code>DISCOGS_API_TOKEN=your_personal_access_token</code>
-                            </div>
-                            <div class="form-hint">Restart VinylPi after updating the token.</div>
                             <div class="discogs-actions">
                                 <button type="button" class="btn-primary" id="discogsConnect">Check connection</button>
                                 <button type="button" id="discogsSync" disabled>Sync collection</button>
@@ -542,6 +537,17 @@
                             <div class="discogs-progress hidden" id="discogsProgress" aria-live="polite">
                                 <div class="discogs-progress-track"><span id="discogsProgressBar"></span></div>
                                 <div class="discogs-progress-copy" id="discogsProgressCopy">Preparing sync…</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <div class="group-title">Credentials</div>
+                            <div class="credentials-card">
+                                <div class="credentials-copy">
+                                    <strong>Discogs API token</strong>
+                                    <span>Stored in <strong>vinylpi.env</strong></span>
+                                </div>
+                                <span class="credentials-state" id="discogsTokenStatus" role="status">Checking…</span>
                             </div>
                         </div>
 
@@ -579,7 +585,7 @@
                         </div>
 
                         <div class="form-group">
-                            <div class="group-title">Spotify account</div>
+                            <div class="group-title">Account</div>
                             <div class="spotify-settings-actions">
                                 <button type="button" class="btn-primary" id="spotifySettingsConnect">Connect Spotify</button>
                                 <button type="button" id="spotifySettingsDisconnect" disabled>Disconnect</button>
@@ -593,9 +599,13 @@
                         </div>
 
                         <div class="form-group">
-                            <div class="group-title">App credentials</div>
-                            <div class="discogs-env-card spotify-env-card">
-                                <span id="spotifySettingsAppStatus">Checking Spotify app configuration…</span>
+                            <div class="group-title">Credentials</div>
+                            <div class="credentials-card">
+                                <div class="credentials-copy">
+                                    <strong>Spotify app credentials</strong>
+                                    <span>Stored in <strong>vinylpi.env</strong></span>
+                                </div>
+                                <span class="credentials-state" id="spotifySettingsAppStatus" role="status">Checking…</span>
                             </div>
                         </div>
                     </div>
@@ -622,6 +632,7 @@
                     </button>
                     <div class="settings-card-content">
                         <div class="form-group">
+                            <div class="group-title">Startup</div>
                             <div class="setting-group-header">
                                 <div>
                                     <div class="group-title">Auto wake</div>
@@ -653,9 +664,10 @@
                         </div>
 
                         <div class="form-group">
+                            <div class="group-title">Automatic sleep</div>
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Auto sleep · Vinyl (silence)</div>
+                                    <div class="group-title">Vinyl · silence</div>
                                     <div class="setting-group-copy">Stop Vinyl after the input stays below the threshold.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="vinylAudioSleepEnabled">
@@ -673,7 +685,7 @@
                         <div class="form-group">
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Auto sleep · Vinyl (recognition)</div>
+                                    <div class="group-title">Vinyl · recognition</div>
                                     <div class="setting-group-copy">Stop Vinyl after repeated unsuccessful recognition attempts.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="vinylAutoSleepEnabled">
@@ -689,7 +701,7 @@
                         <div class="form-group">
                             <div class="setting-group-header">
                                 <div>
-                                    <div class="group-title">Auto sleep · Spotify</div>
+                                    <div class="group-title">Spotify</div>
                                     <div class="setting-group-copy">Stop Spotify after repeated checks without an active track.</div>
                                 </div>
                                 <label class="setting-toggle-label" for="spotifyAutoSleepEnabled">
@@ -711,6 +723,7 @@
                     </button>
                     <div class="settings-card-content">
                         <div class="form-group">
+                            <div class="group-title">Connection</div>
                             <div class="form-row"><label for="useHA">Use HA Integration</label><input type="checkbox" id="useHA"></div>
                             <div data-setting-row="ha-details">
                                 <div class="form-row"><label for="baseURL">Base URL</label><input type="text" id="baseURL" placeholder="http://homeassistant:8123"></div>
@@ -727,6 +740,7 @@
                     </button>
                     <div class="settings-card-content">
                         <div class="form-group">
+                            <div class="group-title">Diagnostics</div>
                             <div class="form-row"><label for="debugLogs">Debug logs</label><input type="checkbox" id="debugLogs"></div>
                             <div class="form-row"><label for="debugPixooFrameEnabled">Save Pixoo frame</label><input type="checkbox" id="debugPixooFrameEnabled"></div>
                             <div class="form-row"><label for="debugPreviewEnabled">Save preview</label><input type="checkbox" id="debugPreviewEnabled"></div>

@@ -48,9 +48,8 @@ function renderSpotifySettings(status = {}) {
     if (disconnect) disconnect.disabled = !connected;
 
     if (appStatus) {
-        appStatus.innerHTML = configured
-            ? 'Spotify app credentials found in <strong>vinylpi.env</strong>'
-            : 'Spotify app credentials missing in <strong>vinylpi.env</strong>';
+        appStatus.textContent = configured ? "Configured" : "Not configured";
+        appStatus.classList.toggle("is-configured", configured);
     }
 }
 

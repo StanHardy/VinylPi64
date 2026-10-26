@@ -707,6 +707,11 @@ function formatDiscogsTimestamp(value) {
 function renderDiscogsStatus(status) {
     const connected = !!status.connected;
     const syncing = !!status.syncing;
+    const tokenStatus = document.getElementById("discogsTokenStatus");
+    if (tokenStatus) {
+        tokenStatus.textContent = connected ? "Configured" : "Not configured";
+        tokenStatus.classList.toggle("is-configured", connected);
+    }
     const dot = document.getElementById("discogsStatusDot");
     const title = document.getElementById("discogsStatusTitle");
     const copy = document.getElementById("discogsStatusCopy");
@@ -1371,7 +1376,7 @@ async function loadConfig() {
         ? pixooAutomations.off_action
         : pixooAutomations.play_gif_on_stop ? "community_gif" : "none";
     document.getElementById("pixooOffEnabled").checked = offAction !== "none";
-    document.getElementById("pixooOffAction").value = offAction === "brightness_off" ? "brightness_off" : "community_gif";
+    document.querySelector(`input[name="pixooOffAction"][value="${offAction === "brightness_off" ? "brightness_off" : "community_gif"}"]`).checked = true;
     loadPixooAutomationGifs(String(pixooAutomations.stop_gif_file_id || ""));
 
     // HOME ASSISTANT
@@ -1606,7 +1611,7 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
     pixooAutomations.turn_on_on_start = document.getElementById("pixooOnVinylStart").checked;
     delete pixooAutomations.turn_on_on_vinyl_start;
     pixooAutomations.off_action = document.getElementById("pixooOffEnabled").checked
-        ? document.getElementById("pixooOffAction").value : "none";
+        ? (document.querySelector('input[name="pixooOffAction"]:checked')?.value || "community_gif") : "none";
     delete pixooAutomations.play_gif_on_stop;
     pixooAutomations.stop_gif_file_id = document.getElementById("pixooStopGifSelect").value.trim();
     // Remove unused Pixoo-via-HA fields from the next config save.
@@ -1829,7 +1834,7 @@ function syncPixooAnimationMode() {
 
 function syncPixooOffAction() {
     const enabled = Boolean(document.getElementById("pixooOffEnabled")?.checked);
-    const action = document.getElementById("pixooOffAction")?.value;
+    const action = document.querySelector('input[name="pixooOffAction"]:checked')?.value;
     const details = document.querySelector('[data-setting-row="pixoo-off-action-details"]');
     const gif = document.querySelector('[data-setting-row="pixoo-off-gif-details"]');
     if (details) details.hidden = !enabled;
@@ -1840,4 +1845,6 @@ document.querySelectorAll('input[name="divoomAnimationMode"]').forEach(input => 
     input.addEventListener("change", syncPixooAnimationMode);
 });
 document.getElementById("pixooOffEnabled")?.addEventListener("change", syncPixooOffAction);
-document.getElementById("pixooOffAction")?.addEventListener("change", syncPixooOffAction);
+document.querySelectorAll('input[name="pixooOffAction"]').forEach(input => {
+    input.addEventListener("change", syncPixooOffAction);
+});
