@@ -24,6 +24,7 @@ from vinylpi.integrations.spotify_client import (
     SpotifyError,
     SpotifyNotAuthorized,
     SpotifyNotConfigured,
+    SpotifyRateLimited,
 )
 from vinylpi.paths import BASE_DIR, get_active_db_path
 from vinylpi.config.runtime import read_config
@@ -198,8 +199,13 @@ def main() -> None:
             show_fallback_image()
             on_recognition_stopped(source="spotify", reason="authorization")
             return
+        except SpotifyRateLimited as exc:
+            logger.warning("Spotify: %s", exc)
+            time.sleep(max(30.0, poll_seconds))
         except SpotifyError as exc:
-            logger.exception(f"Spotify API error: {exc}")
+            # The client has already classified network, rate-limit and API
+            # responses. They are service failures, not Python programming bugs.
+            logger.warning("Spotify: %s", exc)
             time.sleep(max(5.0, poll_seconds))
         except Exception as exc:
             logger.exception(f"Spotify worker error: {exc}")

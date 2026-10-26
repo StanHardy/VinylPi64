@@ -176,8 +176,12 @@ def _resolve_device(configured_name: str) -> int | None:
     global _cached_device_key, _cached_device_index
     try:
         all_devices = _query_audio_input_devices()
-    except Exception as exc:
-        logger.warning(f"Could not query audio devices: {exc}")
+    except (sd.PortAudioError, OSError) as exc:
+        logger.warning("Audio input devices could not be listed. Check the USB audio connection.")
+        logger.debug("PortAudio device discovery detail: %s", exc)
+        return None
+    except Exception:
+        logger.exception("Unexpected error while querying audio input devices")
         return None
 
     if not all_devices:
@@ -228,9 +232,15 @@ def record_sample(seconds_override: float | None = None) -> bytes | None:
     audio_cfg = cfg["audio"]
     debug_cfg = cfg["debug"]
 
-    sample_rate = int(audio_cfg["sample_rate"])
-    seconds = max(0.5, float(seconds_override if seconds_override is not None else audio_cfg["sample_seconds"]))
-    channels = max(1, int(audio_cfg["channels"]))
+    try:
+        sample_rate = int(audio_cfg["sample_rate"])
+        seconds = max(0.5, float(seconds_override if seconds_override is not None else audio_cfg["sample_seconds"]))
+        channels = max(1, int(audio_cfg["channels"]))
+        if sample_rate <= 0 or channels > 2:
+            raise ValueError("unsupported sample rate or channel count")
+    except (KeyError, TypeError, ValueError):
+        logger.error("Invalid recording settings. Check Settings > Audio or reset the audio configuration.")
+        return None
     debug_wav_path = str(debug_cfg.get("wav_path") or "")
 
     device = auto_detect_usb_device()
@@ -246,14 +256,30 @@ def record_sample(seconds_override: float | None = None) -> bytes | None:
             device=device,
         )
         sd.wait()
-    except Exception as exc:
+    except (sd.PortAudioError, OSError) as exc:
         invalidate_audio_device()
-        logger.exception(f"Audio recording failed: {exc}")
+        logger.warning(
+            "Audio recording unavailable. Check the selected input in Settings > Audio "
+            "and reconnect the device if necessary. Retrying."
+        )
+        logger.debug("Audio capture device detail: %s", exc)
+        return None
+    except Exception:
+        invalidate_audio_device()
+        logger.exception("Unexpected error during audio recording")
         return None
 
-    buffer = io.BytesIO()
-    sf.write(buffer, audio, sample_rate, format="WAV")
-    wav_bytes = buffer.getvalue()
+    try:
+        buffer = io.BytesIO()
+        sf.write(buffer, audio, sample_rate, format="WAV")
+        wav_bytes = buffer.getvalue()
+    except (OSError, sf.SoundFileError) as exc:
+        logger.warning("Audio sample could not be encoded. Check storage and audio settings.")
+        logger.debug("WAV encoding detail: %s", exc)
+        return None
+    except Exception:
+        logger.exception("Unexpected error while encoding audio sample")
+        return None
 
     if debug_wav_path:
         try:

@@ -78,8 +78,10 @@ def _migrate_legacy_status_once() -> None:
         if isinstance(status, dict) and get_current_status() is None:
             write_current_status(status)
         _archive_legacy_file(STATUS_PATH)
-    except Exception as exc:
-        logger.exception(f"Could not migrate legacy status.json to SQLite: {exc}")
+    except (OSError, json.JSONDecodeError) as exc:
+        logger.error("Could not import the previous playback status. Check the data directory and legacy status file: %s", type(exc).__name__)
+    except Exception:
+        logger.exception("Unexpected error migrating legacy playback status")
 
 
 def initialize_storage() -> None:
@@ -98,7 +100,9 @@ def initialize_storage() -> None:
         if is_default_profile_active():
             try:
                 _migrate_legacy_statistics_once()
-            except Exception as exc:
-                logger.exception(f"Could not migrate legacy stats.json to SQLite: {exc}")
+            except (OSError, json.JSONDecodeError) as exc:
+                logger.error("Could not import previous statistics. Check the data directory and legacy statistics file: %s", type(exc).__name__)
+            except Exception:
+                logger.exception("Unexpected error migrating legacy statistics")
             _migrate_legacy_status_once()
         _initialized_paths.add(path_key)

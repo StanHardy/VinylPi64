@@ -8,6 +8,7 @@ import re
 from typing import Any
 
 from aiohttp import ClientError
+from PIL import UnidentifiedImageError
 from requests.exceptions import RequestException
 
 from vinylpi.core.genre_tags import normalize_genre
@@ -161,6 +162,8 @@ def recognize_song(wav_bytes: bytes) -> RecognizedTrack | None:
         logger.warning("Shazam recognition timed out. Retrying with the next sample.")
     except (ClientError, ConnectionError, RequestException):
         logger.warning("Shazam recognition failed due to a network connection problem. Retrying.")
+    except UnidentifiedImageError:
+        logger.warning("Shazam artwork could not be loaded. Retrying with the next sample.")
     except Exception:
         # Keep diagnostic tracebacks for genuinely unexpected code failures.
         logger.exception("Unexpected error during song recognition")

@@ -10,7 +10,7 @@ import time
 import requests
 from typing import Optional
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, UnidentifiedImageError
 
 from vinylpi.core.display_layout import normalize_image_config
 from vinylpi.core.image_utils import (
@@ -525,6 +525,12 @@ def show_fallback_image() -> bool:
             fallback_resized,
             debug_label=f"Fallback image '{path}' sent to Pixoo.",
         )
+    except (FileNotFoundError, PermissionError):
+        logger.warning("Configured fallback image is missing or unreadable. Select an image in Settings > Fallback.")
+        return False
+    except (UnidentifiedImageError, OSError):
+        logger.warning("Configured fallback image cannot be opened. Choose a valid image in Settings > Fallback.")
+        return False
     except PixooError as exc:
         _reset_pixoo_client()
         logger.warning("Pixoo fallback unavailable: %s", exc)

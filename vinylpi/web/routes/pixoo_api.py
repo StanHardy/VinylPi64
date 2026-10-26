@@ -26,7 +26,7 @@ def api_pixoo_status():
     try:
         return jsonify(pixoo.get_status())
     except PixooError as e:
-        return jsonify({"ok": False, "online": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "online": False, "error": "Pixoo not available. Check Settings > Pixoo & Network."}), 503
 
 @pixoo_bp.post("/api/pixoo/brightness")
 def api_pixoo_brightness():
@@ -38,7 +38,7 @@ def api_pixoo_brightness():
         pixoo.set_brightness(int(value))
         return jsonify({"ok": True})
     except PixooError as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": "Pixoo not available. Check Settings > Pixoo & Network."}), 503
 
 @pixoo_bp.post("/api/pixoo/reboot")
 def api_pixoo_reboot():
@@ -46,7 +46,7 @@ def api_pixoo_reboot():
         pixoo.reboot()
         return jsonify({"ok": True})
     except PixooError as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": "Pixoo not available. Check Settings > Pixoo & Network."}), 503
 
 @pixoo_bp.post("/api/pixoo/channel")
 def api_pixoo_channel():
@@ -58,7 +58,7 @@ def api_pixoo_channel():
         pixoo.set_channel(int(ch))
         return jsonify({"ok": True})
     except PixooError as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": "Pixoo not available. Check Settings > Pixoo & Network."}), 503
 
 @pixoo_bp.get("/api/pixoo/liked-gifs")
 def api_pixoo_liked_gifs():
@@ -97,14 +97,14 @@ def api_pixoo_play_remote():
         pixoo.play_remote_gif(file_id)
         return jsonify({"ok": True})
     except PixooError as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+        return jsonify({"ok": False, "error": "Pixoo not available. Check Settings > Pixoo & Network."}), 503
 
 @pixoo_bp.post("/api/pixoo/discover-and-save")
 def api_pixoo_discover_and_save():
     try:
         dev = pixoo.discover_cloud_device()
-    except PixooError as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
+    except PixooError:
+        return jsonify({"ok": False, "error": "Divoom device discovery is unavailable. Try again later."}), 502
 
     # Send only updated fields. Writing back a snapshot of the entire config
     # can overwrite changes made by another request (e.g. selected stop GIF).

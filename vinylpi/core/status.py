@@ -1,7 +1,26 @@
 from __future__ import annotations
 import logging
+import sqlite3
 
 logger = logging.getLogger(__name__)
+
+
+def _log_status_error(action: str, exc: Exception) -> None:
+    if isinstance(exc, sqlite3.OperationalError):
+        code = getattr(exc, "sqlite_errorcode", None)
+        primary_code = (code & 0xFF) if isinstance(code, int) else None
+        if primary_code in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) or "locked" in str(exc).lower():
+            logger.warning("Status database is busy. Could not %s; retry on next update.", action)
+        elif primary_code in (sqlite3.SQLITE_CANTOPEN, sqlite3.SQLITE_READONLY,
+                              sqlite3.SQLITE_FULL, sqlite3.SQLITE_IOERR) or str(exc).lower().startswith("unable to open database"):
+            logger.error("Status database unavailable. Could not %s; check disk space and permissions.", action)
+        else:
+            # Invalid SQL/schema errors are bugs; they require a traceback.
+            logger.exception("Unexpected status database error")
+    elif isinstance(exc, OSError):
+        logger.error("Could not %s: storage is unavailable or access was denied.", action)
+    else:
+        logger.exception("Unexpected error updating status database")
 
 
 from vinylpi.core.stats_db import (
@@ -87,7 +106,7 @@ def write_status(
         write_current_status(payload)
         write_source_status(payload["source"], payload)
     except Exception as exc:
-        logger.exception(f"Could not write status to database: {exc}")
+        _log_status_error("save playback status", exc)
 
 
 def get_last_source_status(source: str) -> dict | None:
@@ -140,7 +159,7 @@ def write_side_flip_prompt(
         )
         write_current_status(current)
     except Exception as exc:
-        logger.exception(f"Could not write side-flip prompt status: {exc}")
+        _log_status_error("save record-side prompt", exc)
 
 
 def clear_side_flip_prompt() -> None:
@@ -169,4 +188,4 @@ def clear_side_flip_prompt() -> None:
         )
         write_current_status(current)
     except Exception as exc:
-        logger.exception(f"Could not clear side-flip prompt status: {exc}")
+        _log_status_error("clear record-side prompt", exc)

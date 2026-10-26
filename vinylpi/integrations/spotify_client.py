@@ -34,6 +34,14 @@ class SpotifyNotAuthorized(SpotifyError):
     pass
 
 
+class SpotifyUnavailable(SpotifyError):
+    """Transient network/server problem; safe for the worker to retry."""
+
+
+class SpotifyRateLimited(SpotifyUnavailable):
+    """The Spotify API has temporarily limited requests."""
+
+
 @dataclass(slots=True)
 class SpotifyTrack:
     track_id: str
@@ -48,6 +56,24 @@ class SpotifyTrack:
     spotify_url: str | None
     device_name: str | None = None
     genre: str | None = None
+
+
+def _network_error(exc: requests.RequestException) -> SpotifyUnavailable:
+    if isinstance(exc, requests.Timeout):
+        return SpotifyUnavailable("Spotify request timed out. Retrying shortly.")
+    return SpotifyUnavailable("Spotify could not be reached. Check your internet connection; retrying.")
+
+
+def _response_error(status: int, operation: str) -> SpotifyError:
+    if status == 429:
+        return SpotifyRateLimited("Spotify rate limit reached. Retrying shortly.")
+    if status >= 500:
+        return SpotifyUnavailable("Spotify is temporarily unavailable. Retrying shortly.")
+    if status == 401:
+        return SpotifyNotAuthorized("Spotify session expired. Reconnect Spotify in Settings.")
+    if status == 403:
+        return SpotifyNotAuthorized("Spotify access denied. Check your account and permissions in Settings.")
+    return SpotifyError(f"Spotify {operation} failed (HTTP {status}).")
 
 
 def load_spotify_env() -> None:
@@ -311,11 +337,14 @@ class SpotifyClient:
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
-            raise SpotifyError(f"Spotify authorization request failed: {exc}") from exc
+            raise _network_error(exc) from exc
         if response.status_code >= 400:
-            raise SpotifyError(f"Spotify authorization failed ({response.status_code})")
+            raise _response_error(response.status_code, "authorization")
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise SpotifyUnavailable("Spotify returned an invalid authorization response. Try again.") from exc
         self._accept_token_response(data)
         if not self.refresh_token:
             raise SpotifyError("Spotify authorization did not return a refresh token")
@@ -368,7 +397,7 @@ class SpotifyClient:
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
-            raise SpotifyError(f"Spotify token refresh request failed: {exc}") from exc
+            raise _network_error(exc) from exc
         if response.status_code >= 400:
             try:
                 error_code = str((response.json() or {}).get("error") or "")
@@ -380,10 +409,12 @@ class SpotifyClient:
                 raise SpotifyNotAuthorized(
                     "Spotify authorization expired or was revoked. Reconnect this profile."
                 )
-            raise SpotifyNotAuthorized(
-                f"Spotify token refresh failed ({response.status_code}). Reconnect this profile."
-            )
-        self._accept_token_response(response.json())
+            raise _response_error(response.status_code, "token refresh")
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise SpotifyUnavailable("Spotify returned an invalid token response. Retrying shortly.") from exc
+        self._accept_token_response(data)
         return str(self._access_token)
 
     def _get_access_token(self) -> str:
@@ -403,7 +434,7 @@ class SpotifyClient:
                 timeout=self.timeout,
             )
         except requests.RequestException as exc:
-            raise SpotifyError(f"Spotify API request failed: {exc}") from exc
+            raise _network_error(exc) from exc
         if response.status_code == 401 and retry_auth and self.refresh_token:
             self._access_token = None
             self._access_token_expires_at = 0.0
@@ -414,8 +445,11 @@ class SpotifyClient:
     def get_current_user_profile(self) -> dict:
         response = self._api_get("/me")
         if response.status_code >= 400:
-            raise SpotifyError(f"Spotify profile request failed ({response.status_code})")
-        data = response.json() or {}
+            raise _response_error(response.status_code, "profile request")
+        try:
+            data = response.json() or {}
+        except ValueError as exc:
+            raise SpotifyUnavailable("Spotify returned an invalid profile response. Retrying shortly.") from exc
         if not isinstance(data, dict):
             raise SpotifyError("Spotify returned an invalid account profile")
         return data
@@ -538,11 +572,13 @@ class SpotifyClient:
         response = self._api_get("/me/player/currently-playing")
         if response.status_code == 204:
             return None
-        if response.status_code == 403:
-            raise SpotifyError("Spotify denied playback access. Check the app scopes/account.")
         if response.status_code >= 400:
-            raise SpotifyError(f"Spotify currently-playing request failed ({response.status_code})")
-        track = self.parse_currently_playing(response.json())
+            raise _response_error(response.status_code, "playback request")
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise SpotifyUnavailable("Spotify returned an invalid playback response. Retrying shortly.") from exc
+        track = self.parse_currently_playing(data)
         if track:
             track.genre = self.get_artist_genre(
                 track.artist_id,

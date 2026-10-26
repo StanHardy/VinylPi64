@@ -294,7 +294,12 @@ def wait_for_audio_wake(
                             level_dbfs=level_dbfs,
                             threshold_dbfs=wake_cfg.threshold_dbfs,
                         )
-        except Exception as exc:
-            if debug_log:
-                logger.exception(f"Low-power audio monitor failed: {exc}; retrying in {_RETRY_SECONDS:g}s.")
+        except (sd.PortAudioError, OSError) as exc:
+            from vinylpi.core.audio_capture import invalidate_audio_device
+            invalidate_audio_device()
+            logger.warning("Audio wake monitor lost its input. Check Settings > Audio; retrying.")
+            logger.debug("Auto-wake audio detail: %s", exc)
+            time.sleep(_RETRY_SECONDS)
+        except Exception:
+            logger.exception("Unexpected error in audio wake monitor")
             time.sleep(_RETRY_SECONDS)

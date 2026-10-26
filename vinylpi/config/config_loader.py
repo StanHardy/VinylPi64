@@ -1,5 +1,8 @@
 import json
+import logging
 from copy import deepcopy
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
 from vinylpi.paths import BASE_DIR, CONFIG_PATH, get_active_config_path
 from vinylpi.core.display_layout import normalize_image_config
@@ -140,7 +143,6 @@ def load_config(path: Path | str | None = None) -> dict:
         user_cfg = json.loads(path.read_text(encoding="utf-8"))
         if isinstance(user_cfg, dict):
             deep_update(cfg, user_cfg)
-
             # Migrate the former Vinyl-only ``behavior.auto_sleep`` threshold to
             # the explicit per-source power-saving settings. A value <= 0 used
             # to disable auto sleep, so preserve that behavior as the new toggle.
@@ -157,10 +159,17 @@ def load_config(path: Path | str | None = None) -> dict:
                     behavior_cfg["vinyl_auto_sleep_enabled"] = legacy_iterations > 0
                 if "vinyl_auto_sleep_iterations" not in user_behavior:
                     behavior_cfg["vinyl_auto_sleep_iterations"] = max(1, legacy_iterations or 30)
+        else:
+            logger.error("Configuration is not a JSON object (%s). Using defaults.", path.name)
     except FileNotFoundError:
+        # Expected on a newly created profile: defaults are the initial config.
         pass
-    except Exception:
-        pass
+    except (json.JSONDecodeError, UnicodeError):
+        logger.error("Invalid configuration file (%s). Using defaults; check JSON syntax.", path.name)
+    except PermissionError:
+        logger.error("Configuration file cannot be read (%s). Check file permissions.", path.name)
+    except OSError as exc:
+        logger.error("Configuration file unavailable (%s). Using defaults: %s", path.name, exc.strerror or type(exc).__name__)
 
     # Existing profile settings may still reference fallback files from before
     # normal/ and turn/ galleries were split. Redirect only when an identically

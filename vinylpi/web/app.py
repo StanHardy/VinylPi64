@@ -123,10 +123,11 @@ def create_app() -> Flask:
         if hasattr(g, "_vinylpi_previous_profile_override"):
             restore_profile_storage_override(g._vinylpi_previous_profile_override)
 
-    # Log actual server faults, not routine API access lines or expected 404s.
+    # An expected dependency outage (502/503/504) is already represented by a
+    # handled API response. Reserve ERROR logs for unexpected internal faults.
     @app.after_request
     def _log_server_error(response):
-        if response.status_code >= 500 and request.path.startswith("/api/"):
+        if response.status_code >= 500 and response.status_code not in (502, 503, 504) and request.path.startswith("/api/"):
             logger.error("%s %s returned HTTP %s", request.method, request.path,
                          response.status_code)
         return response
