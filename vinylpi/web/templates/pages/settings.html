@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261025-optimized-logo" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261026-pixoo-gif" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261025-logo" defer></script>
 {% endblock %}
 
@@ -432,6 +432,8 @@
                             <div class="form-row"><label for="divoomDeviceMAC">Device MAC</label><input type="text" id="divoomDeviceMAC" placeholder=""></div>
                             <div class="form-row"><label for="divoomTimeout">Timeout</label><input type="number" id="divoomTimeout" step="0.1"></div>
                             <div class="form-row"><label for="divoomAutoResetGif">Auto Reset GIF ID</label><input type="checkbox" id="divoomAutoResetGif"></div>
+                            <div class="form-row"><label for="divoomAnimationMode">Scrolling playback</label><select id="divoomAnimationMode"><option value="stream">Live frames (default)</option><option value="gif_url">GIF on Pixoo (experimental)</option></select></div>
+                            <div class="form-hint">GIF mode requires the Pixoo to reach VinylPi on your local network (port 8080). Falls back to live frames if preparation or the request fails.</div>
                         </div>
 
                         <div class="form-group">

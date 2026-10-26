@@ -24,3 +24,6 @@ data/.session_secret
 
 # Locally cached Pixoo community GIF list (device-specific)
 data/pixoo_liked_gifs.json
+
+# Generated on-device Pixoo animations
+data/pixoo_animations/

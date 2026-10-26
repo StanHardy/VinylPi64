@@ -53,6 +53,7 @@ CONFIG_DEFAULTS = {
         "device_mac": "",
         "timeout": 2.0,
         "auto_reset_gif_id": False,
+        "animation_mode": "stream",  # stream | gif_url (experimental)
         "discovery": {
             "enabled": True,
             "subnet_prefix": "192.168.2.",

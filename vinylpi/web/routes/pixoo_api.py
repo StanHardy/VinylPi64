@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, abort, send_file
 import ipaddress
 
 from vinylpi.integrations.pixoo_discovery import discover_pixoo_devices, _device_info
@@ -7,6 +7,19 @@ from vinylpi.web.services import pixoo
 from vinylpi.web.services.config import read_config, write_config
 
 pixoo_bp = Blueprint("pixoo_api", __name__)
+
+@pixoo_bp.get("/api/pixoo/animation/<token>.gif")
+def api_pixoo_animation(token: str):
+    """Serve a generated animation to the Pixoo (no browser cookie required)."""
+    from vinylpi.core.pixoo_animation import animation_file
+
+    path = animation_file(token)
+    if path is None or not path.is_file():
+        abort(404)
+    response = send_file(path, mimetype="image/gif", conditional=True, max_age=3600)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
 
 @pixoo_bp.get("/api/pixoo/status")
 def api_pixoo_status():

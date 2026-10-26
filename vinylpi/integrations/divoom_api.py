@@ -240,6 +240,23 @@ class PixooClient:
         })
 
 
+    def play_gif_url(self, url: str) -> None:
+        """Ask the Pixoo to download and loop an HTTP-hosted GIF.
+
+        A successful command response does not confirm that the device managed
+        to fetch the URL. The calling display loop can only verify the local
+        server's availability, not playback on the Pixoo itself.
+        """
+        from urllib.parse import urlsplit
+
+        parsed = urlsplit(url)
+        if parsed.scheme != "http" or not parsed.netloc or parsed.username or parsed.password:
+            raise PixooError("Pixoo GIF URL must use HTTP")
+        if len(url.encode("utf-8")) > 255:
+            raise PixooError("Pixoo GIF URL is too long")
+        self._post({"Command": "Device/PlayTFGif", "FileType": 2, "FileName": url})
+
+
     def get_all_conf(self) -> dict:
         return self._post({"Command": "Channel/GetAllConf"})
 

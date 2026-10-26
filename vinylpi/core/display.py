@@ -6,6 +6,8 @@ logger = logging.getLogger(__name__)
 
 import threading
 import time
+
+import requests
 from typing import Optional
 
 from PIL import Image, ImageDraw
@@ -201,6 +203,8 @@ def _scroll_loop(
     artist: str,
     title: str,
     album: str | None = None,
+    *,
+    stop_event: threading.Event | None = None,
 ) -> None:
     cfg = read_config()
     debug_log = bool(cfg["debug"]["logs"])
@@ -226,8 +230,38 @@ def _scroll_loop(
     has_scrolling_text = any(
         int(line["width"]) > canvas_size for line in resources["lines"]
     )
+    # Capture this generation's event. Replacing a song creates a new global
+    # event; an old renderer must never accidentally start using the new one.
+    cancelled = stop_event if stop_event is not None else _scroll_stop_event
 
-    while not _scroll_stop_event.is_set():
+    if has_scrolling_text and cfg.get("divoom", {}).get("animation_mode") == "gif_url":
+        try:
+            from vinylpi.core.pixoo_animation import build_animation_url, write_animation
+
+            token = write_animation(resources, speed_px_per_s, _render_scroll_frame, cancelled)
+            if token is None or cancelled.is_set():
+                return
+            url = build_animation_url(pixoo.ip, token)
+
+            # The Pixoo may acknowledge a URL that it later cannot download.
+            # Verify that the web server is at least serving the correct file
+            # over the interface we will give the device.
+            with requests.get(url, stream=True, timeout=2) as response:
+                response.raise_for_status()
+                if response.headers.get("Content-Type", "").split(";")[0] != "image/gif":
+                    raise ValueError("VinylPi animation endpoint did not return a GIF")
+            if cancelled.is_set():
+                return
+            pixoo.play_gif_url(url)
+            logger.info("Pixoo on-device GIF playback requested (%s)", pixoo.ip)
+            cancelled.wait()  # The Pixoo loops the file autonomously.
+            return
+        except Exception as exc:
+            if cancelled.is_set():
+                return
+            logger.warning("On-device Pixoo GIF unavailable, using live frames: %s", exc)
+
+    while not cancelled.is_set():
         now = time.monotonic()
         tick_float += speed_px_per_s * (now - last_time)
         last_time = now
@@ -241,7 +275,7 @@ def _scroll_loop(
             if tick == last_sent_tick:
                 # Drawing/sending again would be pixel-identical, just waste
                 # CPU, Wi-Fi and Pixoo HTTP round trips.
-                if _scroll_stop_event.wait(sleep_seconds):
+                if cancelled.wait(sleep_seconds):
                     break
                 continue
 
@@ -273,7 +307,7 @@ def _scroll_loop(
             _reset_pixoo_client()
             break
 
-        if _scroll_stop_event.wait(sleep_seconds):
+        if cancelled.wait(sleep_seconds):
             break
 
 
@@ -291,6 +325,7 @@ def start_scrolling_display(
         _scroll_thread = threading.Thread(
             target=_scroll_loop,
             args=(cover_img, artist, title, album),
+            kwargs={"stop_event": _scroll_stop_event},
             name="vinylpi-pixoo-scroll",
             daemon=True,
         )

@@ -1299,6 +1299,8 @@ async function loadConfig() {
         divoom.timeout ?? 2.0;
     document.getElementById("divoomAutoResetGif").checked =
         !!divoom.auto_reset_gif_id;
+    document.getElementById("divoomAnimationMode").value =
+        divoom.animation_mode === "gif_url" ? "gif_url" : "stream";
 
     document.getElementById("discoveryEnabled").checked =
         !!discovery.enabled;
@@ -1506,6 +1508,8 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseFloat(document.getElementById("divoomTimeout").value) || 2.0;
     divoom.auto_reset_gif_id =
         document.getElementById("divoomAutoResetGif").checked;
+    divoom.animation_mode =
+        document.getElementById("divoomAnimationMode").value === "gif_url" ? "gif_url" : "stream";
 
     // DISCOVERY
     discovery.enabled =
