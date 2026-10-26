@@ -2297,3 +2297,6 @@ body.mobile-display-preview-open {
 }
 /* Empty dynamic notices don't reserve extra space. */
 #pixooStopGifStatus:empty { display: none; }
+
+/* Hidden native-font controls stay hidden when other playback modes are selected. */
+#pixooNativeTextOptions[hidden] { display: none !important; }

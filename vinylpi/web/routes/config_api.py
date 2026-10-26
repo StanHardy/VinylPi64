@@ -54,7 +54,10 @@ def api_config_update():
     display_changed = (
         before.get("image") != updated.get("image")
         or before.get("fallback") != updated.get("fallback")
-        or (before.get("divoom") or {}).get("animation_mode") != (updated.get("divoom") or {}).get("animation_mode")
+        or any(
+            (before.get("divoom") or {}).get(key) != (updated.get("divoom") or {}).get(key)
+            for key in ("animation_mode", "native_text_font", "native_text_height")
+        )
     )
     if display_changed:
         request_display_refresh()
@@ -68,7 +71,10 @@ def api_config_reset():
     display_changed = (
         before.get("image") != updated.get("image")
         or before.get("fallback") != updated.get("fallback")
-        or (before.get("divoom") or {}).get("animation_mode") != (updated.get("divoom") or {}).get("animation_mode")
+        or any(
+            (before.get("divoom") or {}).get(key) != (updated.get("divoom") or {}).get(key)
+            for key in ("animation_mode", "native_text_font", "native_text_height")
+        )
     )
     if display_changed:
         request_display_refresh()

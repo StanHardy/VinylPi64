@@ -26,6 +26,7 @@ _scroll_thread: Optional[threading.Thread] = None
 _scroll_stop_event = threading.Event()
 _pixoo_client: Optional[PixooClient] = None
 _display_lock = threading.RLock()
+_native_overlay_client: Optional[PixooClient] = None
 
 
 def _get_pixoo() -> PixooClient:
@@ -43,13 +44,22 @@ def _reset_pixoo_client() -> None:
 
 
 def stop_scrolling_display() -> None:
-    global _scroll_thread, _scroll_stop_event
+    global _scroll_thread, _scroll_stop_event, _native_overlay_client
 
     with _display_lock:
         if _scroll_thread is not None and _scroll_thread.is_alive():
             _scroll_stop_event.set()
             _scroll_thread.join(timeout=3)
 
+        # Native overlays can survive a background change. Explicitly remove
+        # them when the user stops playback or switches to a new track.
+        old_client = _native_overlay_client
+        _native_overlay_client = None
+        if old_client is not None:
+            try:
+                old_client.clear_http_text()
+            except PixooError as exc:
+                logger.warning("Could not clear Pixoo text overlays: %s", exc)
         _scroll_thread = None
         _scroll_stop_event = threading.Event()
 
@@ -149,6 +159,9 @@ def _prepare_scroll_resources(
 
     return {
         "base_canvas": base_canvas,
+        # Keep the user's preferred cover size; native fonts use different
+        # metrics and must calculate their own layout independently.
+        "source_image_config": img_cfg,
         "font": font,
         "glyph_height": glyph_height,
         "lines": lines,
@@ -198,6 +211,78 @@ def _render_scroll_frame(resources: dict, tick: int) -> Image.Image:
     return frame
 
 
+def _prepare_native_text(cover_img: Image.Image, resources: dict, *,
+                         font_height: int) -> tuple[Image.Image, list[dict]]:
+    """Lay out firmware-rendered text without assuming custom-TTF metrics.
+
+    Firmware fonts are bitmap assets with varying heights. Their estimated
+    height is a separate setting, so we reserve actual screen space per row.
+    The normal layout, uppercase choice and dynamic colors are preserved.
+    """
+    cfg = resources.get("source_image_config", resources["image_config"])
+    visible = resources["lines"]
+    height = max(5, min(16, int(font_height)))
+    gap = int(cfg["line_spacing_margin"])
+    top = int(cfg["top_margin"])
+    cover_gap = int(cfg["margin_image_text"]) if cfg.get("show_cover") and visible else 0
+    text_height = len(visible) * height + max(0, len(visible) - 1) * gap
+    cover_size = int(cfg["cover_size"]) if cfg.get("show_cover") else 0
+    available = int(resources["canvas_size"]) - top - cover_gap - text_height
+    if available < 0:
+        raise ValueError("Selected Pixoo font does not fit the display layout")
+    if cover_size:
+        if available < 8:
+            raise ValueError("Not enough room for cover and native text")
+        cover_size = min(cover_size, available)
+    effective = dict(cfg, cover_size=cover_size)
+    bg_color, _ = resolve_display_colors(cover_img, effective)
+    background = _prepare_base_canvas(cover_img, bg_color, effective)
+
+    y = top + cover_size + cover_gap
+    lines = []
+    for line in visible:
+        lines.append({"text": str(line["text"]), "y": y})
+        y += height + gap
+    return background, lines
+
+
+def _start_native_text(pixoo: PixooClient, cover_img: Image.Image,
+                       resources: dict, divoom_cfg: dict,
+                       speed_px_per_s: float, cancelled: threading.Event) -> bool:
+    """Send one background and firmware-controlled text overlays.
+
+    Return False when cancelled before taking control of the Pixoo.
+    A failure raises, allowing the caller to fall back to RGB streaming.
+    """
+    global _native_overlay_client
+    font = max(0, min(7, int(divoom_cfg.get("native_text_font", 0))))
+    font_height = max(5, min(16, int(divoom_cfg.get("native_text_height", 8))))
+    background, lines = _prepare_native_text(cover_img, resources, font_height=font_height)
+    if cancelled.is_set():
+        return False
+
+    # HTTP text overlays need an active HTTP drawing canvas. Send the
+    # background first, then clear stale overlays before adding new text.
+    pixoo.send_frame(background)
+    _native_overlay_client = pixoo
+    if cancelled.is_set():
+        return False
+    pixoo.clear_http_text()
+    speed_ms = max(10, min(500, round(1000.0 / max(1, speed_px_per_s))))
+    for text_id, line in enumerate(lines, start=1):
+        if cancelled.is_set():
+            return False
+        pixoo.send_http_text(
+            text_id=text_id,
+            text=line["text"],
+            y=line["y"],
+            font=font,
+            speed=speed_ms,
+            color=resources["text_color"],
+        )
+    return not cancelled.is_set()
+
+
 def _scroll_loop(
     cover_img: Image.Image,
     artist: str,
@@ -234,7 +319,27 @@ def _scroll_loop(
     # event; an old renderer must never accidentally start using the new one.
     cancelled = stop_event if stop_event is not None else _scroll_stop_event
 
-    if has_scrolling_text and cfg.get("divoom", {}).get("animation_mode") == "gif_url":
+    mode = cfg.get("divoom", {}).get("animation_mode", "stream")
+    if mode == "native_text" and resources["lines"]:
+        try:
+            if _start_native_text(pixoo, cover_img, resources,
+                                  cfg.get("divoom", {}), speed_px_per_s, cancelled):
+                logger.info("Pixoo native text playback started")
+                cancelled.wait()  # Pixoo handles scrolling autonomously.
+            return
+        except Exception as exc:
+            if cancelled.is_set():
+                return
+            logger.warning("Pixoo native text unavailable, using live frames: %s", exc)
+            # Discard partial overlays before switching back to RGB frames.
+            global _native_overlay_client
+            _native_overlay_client = None
+            try:
+                pixoo.clear_http_text()
+            except PixooError:
+                logger.debug("Pixoo text clear failed during fallback")
+
+    if has_scrolling_text and mode == "gif_url":
         try:
             from vinylpi.core.pixoo_animation import build_animation_url, write_animation
 

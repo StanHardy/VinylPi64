@@ -197,6 +197,38 @@ class PixooClient:
 
         self._post(payload)
 
+    def clear_http_text(self) -> None:
+        """Clear text overlays from the active HTTP-drawing canvas."""
+        self._post({"Command": "Draw/ClearHttpText"})
+
+    def send_http_text(self, *, text_id: int, text: str, y: int,
+                       font: int = 0, speed: int = 50,
+                       color: tuple[int, int, int] = (255, 255, 255)) -> None:
+        """Render/scroll text in the Pixoo firmware (not a custom TTF font)."""
+        if not 0 <= int(text_id) <= 255:
+            raise PixooError("Invalid Pixoo text ID")
+        if not 0 <= int(font) <= 7:
+            raise PixooError("Unsupported Pixoo built-in font (expected 0–7)")
+        if not 0 <= int(y) < 64:
+            raise PixooError("Text position must be within 64px canvas")
+        if not text or len(text.encode("utf-8")) > 255:
+            raise PixooError("Pixoo text must contain 1–255 UTF-8 bytes")
+        if len(color) != 3 or any(not 0 <= int(value) <= 255 for value in color):
+            raise PixooError("Invalid Pixoo text color")
+        self._post({
+            "Command": "Draw/SendHttpText",
+            "TextId": int(text_id),
+            "x": 0,
+            "y": int(y),
+            "dir": 0,
+            "font": int(font),
+            "TextWidth": 64,
+            "TextString": text,
+            "speed": max(1, min(500, int(speed))),
+            "color": "#{:02X}{:02X}{:02X}".format(*(int(value) for value in color)),
+            "align": 2,
+        })
+
     def discover_cloud_device(self) -> dict:
         url = f"{CLOUD_BASE_URL}/Device/ReturnSameLANDevice"
         try:

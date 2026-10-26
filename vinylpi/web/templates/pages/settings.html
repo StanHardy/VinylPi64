@@ -432,8 +432,13 @@
                             <div class="form-row"><label for="divoomDeviceMAC">Device MAC</label><input type="text" id="divoomDeviceMAC" placeholder=""></div>
                             <div class="form-row"><label for="divoomTimeout">Timeout</label><input type="number" id="divoomTimeout" step="0.1"></div>
                             <div class="form-row"><label for="divoomAutoResetGif">Auto Reset GIF ID</label><input type="checkbox" id="divoomAutoResetGif"></div>
-                            <div class="form-row"><label for="divoomAnimationMode">Scrolling playback</label><select id="divoomAnimationMode"><option value="stream">Live frames (default)</option><option value="gif_url">GIF on Pixoo (experimental)</option></select></div>
-                            <div class="form-hint">GIF mode requires the Pixoo to reach VinylPi on your local network (port 8080). Falls back to live frames if preparation or the request fails.</div>
+                            <div class="form-row"><label for="divoomAnimationMode">Scrolling playback</label><select id="divoomAnimationMode"><option value="stream">Live frames (default)</option><option value="gif_url">GIF on Pixoo (experimental)</option><option value="native_text">Native text (experimental)</option></select></div>
+                            <div class="form-hint" id="pixooAnimationHint">GIF mode requires the Pixoo to reach VinylPi on your local network (port 8080).</div>
+                            <div id="pixooNativeTextOptions" hidden>
+                                <div class="form-row"><label for="divoomNativeTextFont">Pixoo font</label><select id="divoomNativeTextFont"><option value="0">Font 0</option><option value="1">Font 1</option><option value="2">Font 2</option><option value="3">Font 3</option><option value="4">Font 4</option><option value="5">Font 5</option><option value="6">Font 6</option><option value="7">Font 7</option></select></div>
+                                <div class="form-row"><label for="divoomNativeTextHeight">Line height (px)</label><input type="number" id="divoomNativeTextHeight" min="5" max="16" step="1"></div>
+                                <div class="form-hint">Native mode uses built-in Pixoo fonts, not your uploaded TTF. Adjust line height if the text overlaps. Live frames and GIF keep your selected TTF.</div>
+                            </div>
                         </div>
 
                         <div class="form-group">

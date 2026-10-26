@@ -1300,7 +1300,12 @@ async function loadConfig() {
     document.getElementById("divoomAutoResetGif").checked =
         !!divoom.auto_reset_gif_id;
     document.getElementById("divoomAnimationMode").value =
-        divoom.animation_mode === "gif_url" ? "gif_url" : "stream";
+        ["stream", "gif_url", "native_text"].includes(divoom.animation_mode) ? divoom.animation_mode : "stream";
+    document.getElementById("divoomNativeTextFont").value =
+        String(Math.max(0, Math.min(7, Number(divoom.native_text_font ?? 0) || 0)));
+    document.getElementById("divoomNativeTextHeight").value =
+        divoom.native_text_height ?? 8;
+    syncPixooAnimationMode();
 
     document.getElementById("discoveryEnabled").checked =
         !!discovery.enabled;
@@ -1508,8 +1513,12 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseFloat(document.getElementById("divoomTimeout").value) || 2.0;
     divoom.auto_reset_gif_id =
         document.getElementById("divoomAutoResetGif").checked;
-    divoom.animation_mode =
-        document.getElementById("divoomAnimationMode").value === "gif_url" ? "gif_url" : "stream";
+    const animationMode = document.getElementById("divoomAnimationMode").value;
+    divoom.animation_mode = ["stream", "gif_url", "native_text"].includes(animationMode) ? animationMode : "stream";
+    divoom.native_text_font = Math.max(0, Math.min(7,
+        parseInt(document.getElementById("divoomNativeTextFont").value, 10) || 0));
+    divoom.native_text_height = Math.max(5, Math.min(16,
+        parseInt(document.getElementById("divoomNativeTextHeight").value, 10) || 8));
 
     // DISCOVERY
     discovery.enabled =
@@ -1807,3 +1816,18 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }
 });
+
+function syncPixooAnimationMode() {
+    const mode = document.getElementById("divoomAnimationMode")?.value || "stream";
+    const nativeOptions = document.getElementById("pixooNativeTextOptions");
+    if (nativeOptions) nativeOptions.hidden = mode !== "native_text";
+    const hint = document.getElementById("pixooAnimationHint");
+    if (hint) {
+        hint.textContent = mode === "gif_url"
+            ? "The Pixoo must reach VinylPi on your local network (port 8080)."
+            : mode === "native_text"
+                ? "The Pixoo scrolls its own text above a static album cover."
+                : "VinylPi sends frames continuously while the text scrolls.";
+    }
+}
+document.getElementById("divoomAnimationMode")?.addEventListener("change", syncPixooAnimationMode);

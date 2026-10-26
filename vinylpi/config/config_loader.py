@@ -53,7 +53,9 @@ CONFIG_DEFAULTS = {
         "device_mac": "",
         "timeout": 2.0,
         "auto_reset_gif_id": False,
-        "animation_mode": "stream",  # stream | gif_url (experimental)
+        "animation_mode": "stream",  # stream | gif_url | native_text
+        "native_text_font": 0,  # Divoom firmware font ID; user TTFs are not supported.
+        "native_text_height": 8,  # Estimated font row height (px); varies by firmware font.
         "discovery": {
             "enabled": True,
             "subnet_prefix": "192.168.2.",
