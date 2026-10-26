@@ -24,26 +24,48 @@ def _client(divoom: dict) -> PixooClient:
                        auto_discover=False)
 
 
-def on_vinyl_started(*, reason: str = "manual") -> bool:
+def on_playback_started(*, source: str, reason: str = "manual") -> bool:
     settings, divoom = _settings()
-    if not settings.get("turn_on_on_vinyl_start", False):
+    enabled = settings.get("turn_on_on_start")
+    if enabled is None:  # Pre-migration config compatibility.
+        enabled = settings.get("turn_on_on_vinyl_start", False)
+    if not enabled:
         return False
     try:
         _client(divoom).set_brightness(100)
     except Exception as exc:
-        logger.warning(f"[Pixoo automation] Could not turn on Pixoo ({reason}): {exc}")
+        logger.warning("[Pixoo automation] Could not turn on Pixoo (%s/%s): %s", source, reason, exc)
         return False
     return True
 
 
+def on_vinyl_started(*, reason: str = "manual") -> bool:
+    """Compatibility entry point for the Vinyl recognizer."""
+    return on_playback_started(source="vinyl", reason=reason)
+
+
 def on_recognition_stopped(*, source: str, reason: str) -> bool:
     settings, divoom = _settings()
+    action = settings.get("off_action", "none")
+    # Compatibility when called with a pre-migration config dictionary.
+    if "off_action" not in settings and settings.get("play_gif_on_stop"):
+        action = "community_gif"
+    if action == "none":
+        return False
     file_id = str(settings.get("stop_gif_file_id") or "").strip()
-    if not settings.get("play_gif_on_stop", False) or not file_id:
+    if action == "community_gif" and not file_id:
+        logger.warning("[Pixoo automation] No community GIF is selected")
+        return False
+    if action not in ("community_gif", "brightness_off"):
+        logger.warning("[Pixoo automation] Invalid turn-off action: %s", action)
         return False
     try:
-        _client(divoom).play_remote_gif(file_id)
+        pixoo = _client(divoom)
+        if action == "community_gif":
+            pixoo.play_remote_gif(file_id)
+        else:
+            pixoo.set_brightness(0)
     except Exception as exc:
-        logger.warning(f"[Pixoo automation] Could not play stop GIF ({source}/{reason}): {exc}")
+        logger.warning("[Pixoo automation] Could not run turn-off action (%s/%s): %s", source, reason, exc)
         return False
     return True

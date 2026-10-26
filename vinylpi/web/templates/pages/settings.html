@@ -3,11 +3,11 @@
 {% block title %}VinylPi Settings{% endblock %}
 
 {% block page_styles %}
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261025-optimized-logo">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/settings.css') }}?v=20261026-display-automation">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261026-pixoo-gif" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/settings.js') }}?v=20261026-display-automation" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_settings.js') }}?v=20261025-logo" defer></script>
 {% endblock %}
 
@@ -332,8 +332,28 @@
                                 </div>
 
                                 <div class="form-group">
-                                    <div class="group-title">Animation</div>
-                                    <div class="form-row"><label for="marqueeSpeed">Scroll speed</label><input type="number" id="marqueeSpeed" min="1" max="200"></div>
+                                    <div class="group-title">Album artwork</div>
+                                    <div class="form-row cover-source-row">
+                                        <span id="discogsCoverSourceLabel" class="cover-source-label">Preferred album cover</span>
+                                        <div class="cover-source-segmented" role="radiogroup" aria-labelledby="discogsCoverSourceLabel">
+                                            <label><input type="radio" name="discogsCoverSource" value="shazam" checked><span>Shazam</span></label>
+                                            <label><input type="radio" name="discogsCoverSource" value="discogs"><span>Discogs</span></label>
+                                        </div>
+                                    </div>
+                                    <div class="form-hint">Discogs artwork is used when a matching record cover is available.</div>
+                                </div>
+
+                                <div class="form-group">
+                                    <div class="group-title">Scrolling text</div>
+                                    <div class="form-row"><label for="marqueeSpeed">Scroll speed (px/s)</label><input type="number" id="marqueeSpeed" min="1" max="200"></div>
+                                    <div class="form-row">
+                                        <span id="divoomAnimationModeLabel" class="cover-source-label">Playback mode</span>
+                                        <div class="cover-source-segmented" role="radiogroup" aria-labelledby="divoomAnimationModeLabel">
+                                            <label><input type="radio" name="divoomAnimationMode" value="stream" checked><span>Live frames</span></label>
+                                            <label><input type="radio" name="divoomAnimationMode" value="gif_url"><span>GIF on Pixoo</span></label>
+                                        </div>
+                                    </div>
+                                    <div class="form-hint" id="pixooAnimationHint" aria-live="polite"></div>
                                 </div>
                             </div>
                         </div>
@@ -432,13 +452,7 @@
                             <div class="form-row"><label for="divoomDeviceMAC">Device MAC</label><input type="text" id="divoomDeviceMAC" placeholder=""></div>
                             <div class="form-row"><label for="divoomTimeout">Timeout</label><input type="number" id="divoomTimeout" step="0.1"></div>
                             <div class="form-row"><label for="divoomAutoResetGif">Auto Reset GIF ID</label><input type="checkbox" id="divoomAutoResetGif"></div>
-                            <div class="form-row"><label for="divoomAnimationMode">Scrolling playback</label><select id="divoomAnimationMode"><option value="stream">Live frames (default)</option><option value="gif_url">GIF on Pixoo (experimental)</option><option value="native_text">Native text (experimental)</option></select></div>
-                            <div class="form-hint" id="pixooAnimationHint">GIF mode requires the Pixoo to reach VinylPi on your local network (port 8080).</div>
-                            <div id="pixooNativeTextOptions" hidden>
-                                <div class="form-row"><label for="divoomNativeTextFont">Pixoo font</label><select id="divoomNativeTextFont"><option value="0">Font 0</option><option value="1">Font 1</option><option value="2">Font 2</option><option value="3">Font 3</option><option value="4">Font 4</option><option value="5">Font 5</option><option value="6">Font 6</option><option value="7">Font 7</option></select></div>
-                                <div class="form-row"><label for="divoomNativeTextHeight">Line height (px)</label><input type="number" id="divoomNativeTextHeight" min="5" max="16" step="1"></div>
-                                <div class="form-hint">Native mode uses built-in Pixoo fonts, not your uploaded TTF. Adjust line height if the text overlaps. Live frames and GIF keep your selected TTF.</div>
-                            </div>
+
                         </div>
 
                         <div class="form-group">
@@ -456,8 +470,8 @@
                             <div class="pixoo-automation-option">
                                 <div class="setting-group-header">
                                     <div>
-                                        <div class="group-title">Turn on when Vinyl starts</div>
-                                        <div class="setting-group-copy">Set Pixoo brightness to 100% on manual start and auto wake.</div>
+                                        <div class="group-title">Turn on automation</div>
+                                        <div class="setting-group-copy">Set Pixoo brightness to 100% when Vinyl or Spotify starts.</div>
                                     </div>
                                     <label class="setting-toggle-label" for="pixooOnVinylStart"><span>Enabled</span><input type="checkbox" id="pixooOnVinylStart"></label>
                                 </div>
@@ -465,19 +479,30 @@
                             <div class="pixoo-automation-option">
                                 <div class="setting-group-header">
                                     <div>
-                                        <div class="group-title">Play a community GIF on Off</div>
-                                        <div class="setting-group-copy">Play your selected Divoom GIF when recognition stops, including auto sleep.</div>
+                                        <div class="group-title">Turn off automation</div>
+                                        <div class="setting-group-copy">Choose what Pixoo displays when playback stops, including auto sleep.</div>
                                     </div>
-                                    <label class="setting-toggle-label" for="pixooPlayGifOnStop"><span>Enabled</span><input type="checkbox" id="pixooPlayGifOnStop"></label>
+                                    <label class="setting-toggle-label" for="pixooOffEnabled"><span>Enabled</span><input type="checkbox" id="pixooOffEnabled"></label>
                                 </div>
-                                <div class="form-row pixoo-automation-gif-row">
-                                    <label for="pixooStopGifSelect">Community GIF</label>
-                                    <div class="pixoo-automation-gif-picker">
-                                        <select id="pixooStopGifSelect"><option value="">No GIF selected</option></select>
-                                        <button type="button" id="pixooRefreshLikes" title="Refresh liked GIFs from Divoom">Refresh</button>
+                                <div data-setting-row="pixoo-off-action-details" hidden>
+                                    <div class="form-row">
+                                        <label for="pixooOffAction">Action</label>
+                                        <select id="pixooOffAction">
+                                            <option value="community_gif">Play community GIF</option>
+                                            <option value="brightness_off">Turn off display (brightness 0%)</option>
+                                        </select>
+                                    </div>
+                                    <div data-setting-row="pixoo-off-gif-details" hidden>
+                                        <div class="form-row pixoo-automation-gif-row">
+                                            <label for="pixooStopGifSelect">Community GIF</label>
+                                            <div class="pixoo-automation-gif-picker">
+                                                <select id="pixooStopGifSelect"><option value="">No GIF selected</option></select>
+                                                <button type="button" id="pixooRefreshLikes" title="Refresh liked GIFs from Divoom">Refresh</button>
+                                            </div>
+                                        </div>
+                                        <div class="form-hint" id="pixooStopGifStatus" role="status" aria-live="polite"></div>
                                     </div>
                                 </div>
-                                <div class="form-hint" id="pixooStopGifStatus" role="status" aria-live="polite"></div>
                             </div>
                         </div>
                     </div>
@@ -526,14 +551,6 @@
                             <div data-setting-row="discogs-details">
                                 <div class="form-row"><label for="discogsPreferCollection">Prefer collection matches</label><input type="checkbox" id="discogsPreferCollection"></div>
                                 
-                                <div class="form-row cover-source-row">
-                                    <span id="discogsCoverSourceLabel" class="cover-source-label">Preferred album cover</span>
-                                    <div class="cover-source-segmented" role="radiogroup" aria-labelledby="discogsCoverSourceLabel">
-                                        <label><input type="radio" name="discogsCoverSource" value="shazam" checked><span>Shazam</span></label>
-                                        <label><input type="radio" name="discogsCoverSource" value="discogs"><span>Discogs</span></label>
-                                    </div>
-                                </div>
-                                <div class="form-hint">Shazam uses digital artwork; Discogs uses your record’s cover.</div>
                                 <div class="form-row"><label for="discogsSequenceMatching">Use record sequence</label><input type="checkbox" id="discogsSequenceMatching"></div>
                                 
                                 <div class="form-row"><label for="discogsInferNext">Estimate an unrecognized next track</label><input type="checkbox" id="discogsInferNext"></div>

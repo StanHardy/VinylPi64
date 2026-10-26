@@ -14,8 +14,8 @@ from vinylpi.web.services import pixoo
 
 class PixooAutomationsTests(unittest.TestCase):
     def test_default_disabled_and_no_legacy_ha_callbacks(self):
-        self.assertFalse(CONFIG_DEFAULTS["pixoo_automations"]["turn_on_on_vinyl_start"])
-        self.assertFalse(CONFIG_DEFAULTS["pixoo_automations"]["play_gif_on_stop"])
+        self.assertFalse(CONFIG_DEFAULTS["pixoo_automations"]["turn_on_on_start"])
+        self.assertEqual(CONFIG_DEFAULTS["pixoo_automations"]["off_action"], "none")
         self.assertNotIn("stop_webhook_id", CONFIG_DEFAULTS["homeassistant"])
         self.assertNotIn("wake_webhook_id", CONFIG_DEFAULTS["homeassistant"])
 
@@ -29,6 +29,32 @@ class PixooAutomationsTests(unittest.TestCase):
             self.assertEqual(cfg["homeassistant"]["webhook_id"], "rgb")
             self.assertNotIn("stop_webhook_id", cfg["homeassistant"])
             self.assertNotIn("wake_webhook_id", cfg["homeassistant"])
+
+    def test_legacy_stop_gif_migrates_to_off_action(self):
+        with tempfile.TemporaryDirectory() as folder:
+            location = Path(folder) / "config.json"
+            location.write_text(json.dumps({"pixoo_automations": {
+                "turn_on_on_vinyl_start": True,
+                "play_gif_on_stop": True, "stop_gif_file_id": "4321",
+            }, "divoom": {"animation_mode": "native_text", "native_text_font": 3}}))
+            loaded = load_config(location)
+            self.assertEqual(loaded["pixoo_automations"]["off_action"], "community_gif")
+            self.assertTrue(loaded["pixoo_automations"]["turn_on_on_start"])
+            self.assertNotIn("turn_on_on_vinyl_start", loaded["pixoo_automations"])
+            self.assertEqual(loaded["pixoo_automations"]["stop_gif_file_id"], "4321")
+            self.assertNotIn("play_gif_on_stop", loaded["pixoo_automations"])
+            self.assertEqual(loaded["divoom"]["animation_mode"], "stream")
+            self.assertNotIn("native_text_font", loaded["divoom"])
+
+    def test_explicit_off_action_overrides_legacy_switch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            location = Path(folder) / "config.json"
+            location.write_text(json.dumps({"pixoo_automations": {
+                "off_action": "brightness_off", "play_gif_on_stop": True,
+            }}))
+            loaded = load_config(location)
+            self.assertEqual(loaded["pixoo_automations"]["off_action"], "brightness_off")
+            self.assertNotIn("play_gif_on_stop", loaded["pixoo_automations"])
 
     @patch("vinylpi.integrations.divoom_api.read_config")
     def test_fast_client_does_not_probe_or_discover(self, config):

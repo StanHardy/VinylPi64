@@ -6,6 +6,7 @@ import threading
 from typing import Optional
 
 from vinylpi.paths import BASE_DIR
+from vinylpi.integrations.pixoo_automations import on_playback_started
 
 _spotify_proc: Optional[subprocess.Popen] = None
 _lock = threading.Lock()
@@ -32,7 +33,10 @@ def start(*, silence_output: bool) -> bool:
         if silence_output:
             kwargs.update(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         _spotify_proc = subprocess.Popen(cmd, **kwargs)
-        return True
+
+    # Restore brightness after a previous stop action (also for Spotify).
+    on_playback_started(source="spotify")
+    return True
 
 
 def stop() -> bool:

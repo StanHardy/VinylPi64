@@ -687,8 +687,8 @@
     place-items: center;
     border: 1px solid var(--border-strong);
     border-radius: 9px;
-    color: var(--yellow);
-    background: rgba(245, 197, 66, 0.07);
+    color: var(--text);
+    background: rgba(255, 255, 255, 0.04);
     font-size: 13px;
     font-weight: 820;
 }
@@ -884,7 +884,7 @@
 }
 
 .discogs-counts strong {
-    color: var(--yellow);
+    color: var(--text);
     font-size: 18px;
 }
 
@@ -912,9 +912,9 @@
     display: block;
     overflow-x: auto;
     padding: 10px 12px;
-    border: 1px solid rgba(245, 197, 66, 0.24);
+    border: 1px solid var(--border-strong);
     border-radius: 9px;
-    color: var(--yellow);
+    color: var(--text);
     background: rgba(10, 10, 15, 0.42);
     font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
     font-size: 12px;
@@ -1635,10 +1635,10 @@
 .display-pixel-badge {
     flex: 0 0 auto;
     padding: 5px 8px;
-    border: 1px solid rgba(245, 197, 66, 0.3);
+    border: 1px solid var(--border-strong);
     border-radius: 999px;
-    background: rgba(245, 197, 66, 0.09);
-    color: var(--yellow);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--muted);
     font-size: 10px;
     font-weight: 800;
     letter-spacing: 0.05em;
@@ -2287,7 +2287,7 @@ body.mobile-display-preview-open {
 #pixooDeviceStatus { margin-top: 8px; }
 #scanPixooDevices:disabled { cursor: progress; opacity: .55; }
 
-/* Hierarchy: automation names are labels within Automations, not section headers. */
+/* Automation names use the same secondary style as other toggles. */
 .pixoo-automations-group .pixoo-automation-option .group-title {
     color: var(--text);
     font-size: 14px;
@@ -2298,5 +2298,18 @@ body.mobile-display-preview-open {
 /* Empty dynamic notices don't reserve extra space. */
 #pixooStopGifStatus:empty { display: none; }
 
-/* Hidden native-font controls stay hidden when other playback modes are selected. */
-#pixooNativeTextOptions[hidden] { display: none !important; }
+/* Yellow belongs to section headings; option titles are secondary labels. */
+.setting-group-header .group-title {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* The same segmented control is reused for artwork and scrolling playback. */
+.display-designer .cover-source-segmented { max-width: 420px; }
+
+/* Hide disabled automation details even inside the flex-form layout. */
+[data-setting-row="pixoo-off-action-details"][hidden],
+[data-setting-row="pixoo-off-gif-details"][hidden] { display: none !important; }

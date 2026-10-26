@@ -5,14 +5,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from vinylpi.integrations.pixoo_automations import on_recognition_stopped, on_vinyl_started
+from vinylpi.integrations.pixoo_automations import on_playback_started, on_recognition_stopped, on_vinyl_started
 from vinylpi.web.services import source
 
 
 class PixooDirectActionTests(unittest.TestCase):
     def setUp(self):
-        self.cfg = {"pixoo_automations": {"turn_on_on_vinyl_start": True,
-                                          "play_gif_on_stop": True,
+        self.cfg = {"pixoo_automations": {"turn_on_on_start": True,
+                                          "off_action": "community_gif",
                                           "stop_gif_file_id": "4321"},
                     "divoom": {"ip": "192.0.2.25", "timeout": 1},
                     "homeassistant": {"use_ha": False}}
@@ -26,6 +26,13 @@ class PixooDirectActionTests(unittest.TestCase):
 
     @patch("vinylpi.integrations.pixoo_automations._client")
     @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_spotify_start_restores_brightness(self, config, client):
+        config.return_value = self.cfg
+        self.assertTrue(on_playback_started(source="spotify"))
+        client.return_value.set_brightness.assert_called_once_with(100)
+
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
     def test_stop_plays_selected_gif(self, config, client):
         config.return_value = self.cfg
         self.assertTrue(on_recognition_stopped(source="spotify", reason="auto_sleep"))
@@ -33,9 +40,35 @@ class PixooDirectActionTests(unittest.TestCase):
 
     @patch("vinylpi.integrations.pixoo_automations._client")
     @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_turn_off_sets_brightness_to_zero(self, config, client):
+        config.return_value = self.cfg
+        self.cfg["pixoo_automations"]["off_action"] = "brightness_off"
+        self.assertTrue(on_recognition_stopped(source="vinyl", reason="auto_sleep"))
+        client.return_value.set_brightness.assert_called_once_with(0)
+        client.return_value.play_remote_gif.assert_not_called()
+
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_disabled_action_does_not_contact_pixoo(self, config, client):
+        config.return_value = self.cfg
+        self.cfg["pixoo_automations"]["off_action"] = "none"
+        self.assertFalse(on_recognition_stopped(source="spotify", reason="manual"))
+        client.assert_not_called()
+
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
+    def test_missing_gif_does_not_turn_off_brightness(self, config, client):
+        config.return_value = self.cfg
+        self.cfg["pixoo_automations"]["off_action"] = "community_gif"
+        self.cfg["pixoo_automations"]["stop_gif_file_id"] = ""
+        self.assertFalse(on_recognition_stopped(source="vinyl", reason="auto_sleep"))
+        client.assert_not_called()
+
+    @patch("vinylpi.integrations.pixoo_automations._client")
+    @patch("vinylpi.integrations.pixoo_automations.read_config")
     def test_disabled_and_missing_selection_do_not_send(self, config, client):
         config.return_value = self.cfg
-        self.cfg["pixoo_automations"]["turn_on_on_vinyl_start"] = False
+        self.cfg["pixoo_automations"]["turn_on_on_start"] = False
         self.cfg["pixoo_automations"]["stop_gif_file_id"] = ""
         self.assertFalse(on_vinyl_started())
         self.assertFalse(on_recognition_stopped(source="vinyl", reason="manual"))
@@ -47,6 +80,21 @@ class PixooDirectActionTests(unittest.TestCase):
         config.return_value = self.cfg
         self.assertFalse(on_vinyl_started())
         self.assertFalse(on_recognition_stopped(source="vinyl", reason="manual"))
+
+
+class SpotifyStartAutomationTests(unittest.TestCase):
+    @patch("vinylpi.web.services.spotify.on_playback_started")
+    @patch("vinylpi.web.services.spotify.subprocess.Popen")
+    def test_only_new_worker_triggers_turn_on(self, popen, on_started):
+        from vinylpi.web.services import spotify
+        previous = spotify._spotify_proc
+        spotify._spotify_proc = None
+        self.addCleanup(setattr, spotify, "_spotify_proc", previous)
+        popen.return_value.poll.return_value = None
+        self.assertTrue(spotify.start(silence_output=True))
+        self.assertFalse(spotify.start(silence_output=True))
+        on_started.assert_called_once_with(source="spotify")
+        popen.assert_called_once()
 
 
 class SourceTransitionTests(unittest.TestCase):

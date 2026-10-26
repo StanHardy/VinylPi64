@@ -296,6 +296,7 @@ function syncDependentSettingStates() {
     setDependentState("discoveryEnabled", "discovery-details");
     setDependentState("useHA", "ha-details");
     setDependentState("discogsEnabled", "discogs-details");
+    syncPixooOffAction();
     setDependentState("vinylAutoWakeEnabled", "vinyl-auto-wake-details");
     setDependentState("vinylAudioSleepEnabled", "vinyl-audio-sleep-details");
     setDependentState("vinylAutoSleepEnabled", "vinyl-auto-sleep-details");
@@ -1299,12 +1300,8 @@ async function loadConfig() {
         divoom.timeout ?? 2.0;
     document.getElementById("divoomAutoResetGif").checked =
         !!divoom.auto_reset_gif_id;
-    document.getElementById("divoomAnimationMode").value =
-        ["stream", "gif_url", "native_text"].includes(divoom.animation_mode) ? divoom.animation_mode : "stream";
-    document.getElementById("divoomNativeTextFont").value =
-        String(Math.max(0, Math.min(7, Number(divoom.native_text_font ?? 0) || 0)));
-    document.getElementById("divoomNativeTextHeight").value =
-        divoom.native_text_height ?? 8;
+    const selectedAnimation = divoom.animation_mode === "gif_url" ? "gif_url" : "stream";
+    document.querySelector(`input[name="divoomAnimationMode"][value="${selectedAnimation}"]`).checked = true;
     syncPixooAnimationMode();
 
     document.getElementById("discoveryEnabled").checked =
@@ -1369,8 +1366,12 @@ async function loadConfig() {
         !!debug.wav_path;
 
     // PIXOO AUTOMATIONS: source-independent, per-profile settings.
-    document.getElementById("pixooOnVinylStart").checked = !!pixooAutomations.turn_on_on_vinyl_start;
-    document.getElementById("pixooPlayGifOnStop").checked = !!pixooAutomations.play_gif_on_stop;
+    document.getElementById("pixooOnVinylStart").checked = !!(pixooAutomations.turn_on_on_start ?? pixooAutomations.turn_on_on_vinyl_start);
+    const offAction = ["community_gif", "brightness_off"].includes(pixooAutomations.off_action)
+        ? pixooAutomations.off_action
+        : pixooAutomations.play_gif_on_stop ? "community_gif" : "none";
+    document.getElementById("pixooOffEnabled").checked = offAction !== "none";
+    document.getElementById("pixooOffAction").value = offAction === "brightness_off" ? "brightness_off" : "community_gif";
     loadPixooAutomationGifs(String(pixooAutomations.stop_gif_file_id || ""));
 
     // HOME ASSISTANT
@@ -1513,12 +1514,10 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         parseFloat(document.getElementById("divoomTimeout").value) || 2.0;
     divoom.auto_reset_gif_id =
         document.getElementById("divoomAutoResetGif").checked;
-    const animationMode = document.getElementById("divoomAnimationMode").value;
-    divoom.animation_mode = ["stream", "gif_url", "native_text"].includes(animationMode) ? animationMode : "stream";
-    divoom.native_text_font = Math.max(0, Math.min(7,
-        parseInt(document.getElementById("divoomNativeTextFont").value, 10) || 0));
-    divoom.native_text_height = Math.max(5, Math.min(16,
-        parseInt(document.getElementById("divoomNativeTextHeight").value, 10) || 8));
+    divoom.animation_mode = document.querySelector('input[name="divoomAnimationMode"]:checked')?.value === "gif_url"
+        ? "gif_url" : "stream";
+    delete divoom.native_text_font;
+    delete divoom.native_text_height;
 
     // DISCOVERY
     discovery.enabled =
@@ -1604,8 +1603,11 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
         ? "data/debug/recording.wav" : "";
 
     // PIXOO AUTOMATIONS (no Home Assistant dependency)
-    pixooAutomations.turn_on_on_vinyl_start = document.getElementById("pixooOnVinylStart").checked;
-    pixooAutomations.play_gif_on_stop = document.getElementById("pixooPlayGifOnStop").checked;
+    pixooAutomations.turn_on_on_start = document.getElementById("pixooOnVinylStart").checked;
+    delete pixooAutomations.turn_on_on_vinyl_start;
+    pixooAutomations.off_action = document.getElementById("pixooOffEnabled").checked
+        ? document.getElementById("pixooOffAction").value : "none";
+    delete pixooAutomations.play_gif_on_stop;
     pixooAutomations.stop_gif_file_id = document.getElementById("pixooStopGifSelect").value.trim();
     // Remove unused Pixoo-via-HA fields from the next config save.
     for (const key of ["stop_webhook_id", "wake_webhook_id", "replay_on_stop_enabled", "wake_webhook_enabled"]) {
@@ -1818,16 +1820,24 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function syncPixooAnimationMode() {
-    const mode = document.getElementById("divoomAnimationMode")?.value || "stream";
-    const nativeOptions = document.getElementById("pixooNativeTextOptions");
-    if (nativeOptions) nativeOptions.hidden = mode !== "native_text";
+    const mode = document.querySelector('input[name="divoomAnimationMode"]:checked')?.value || "stream";
     const hint = document.getElementById("pixooAnimationHint");
-    if (hint) {
-        hint.textContent = mode === "gif_url"
-            ? "The Pixoo must reach VinylPi on your local network (port 8080)."
-            : mode === "native_text"
-                ? "The Pixoo scrolls its own text above a static album cover."
-                : "VinylPi sends frames continuously while the text scrolls.";
-    }
+    if (hint) hint.textContent = mode === "gif_url"
+        ? "Smooth on-device animation; a short load may occur when the track changes."
+        : "Continuous frame updates; no initial GIF loading.";
 }
-document.getElementById("divoomAnimationMode")?.addEventListener("change", syncPixooAnimationMode);
+
+function syncPixooOffAction() {
+    const enabled = Boolean(document.getElementById("pixooOffEnabled")?.checked);
+    const action = document.getElementById("pixooOffAction")?.value;
+    const details = document.querySelector('[data-setting-row="pixoo-off-action-details"]');
+    const gif = document.querySelector('[data-setting-row="pixoo-off-gif-details"]');
+    if (details) details.hidden = !enabled;
+    if (gif) gif.hidden = !enabled || action !== "community_gif";
+}
+
+document.querySelectorAll('input[name="divoomAnimationMode"]').forEach(input => {
+    input.addEventListener("change", syncPixooAnimationMode);
+});
+document.getElementById("pixooOffEnabled")?.addEventListener("change", syncPixooOffAction);
+document.getElementById("pixooOffAction")?.addEventListener("change", syncPixooOffAction);

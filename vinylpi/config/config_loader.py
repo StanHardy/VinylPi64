@@ -53,9 +53,7 @@ CONFIG_DEFAULTS = {
         "device_mac": "",
         "timeout": 2.0,
         "auto_reset_gif_id": False,
-        "animation_mode": "stream",  # stream | gif_url | native_text
-        "native_text_font": 0,  # Divoom firmware font ID; user TTFs are not supported.
-        "native_text_height": 8,  # Estimated font row height (px); varies by firmware font.
+        "animation_mode": "stream",  # stream | gif_url
         "discovery": {
             "enabled": True,
             "subnet_prefix": "192.168.2.",
@@ -108,8 +106,8 @@ CONFIG_DEFAULTS = {
         "stats_min_consecutive": 3
     },
     "pixoo_automations": {
-        "turn_on_on_vinyl_start": False,
-        "play_gif_on_stop": False,
+        "turn_on_on_start": False,
+        "off_action": "none",  # none | community_gif | brightness_off
         "stop_gif_file_id": ""
     },
     "homeassistant": {
@@ -136,6 +134,7 @@ def load_config(path: Path | str | None = None) -> dict:
     else:
         path = get_active_config_path()
     cfg = deepcopy(CONFIG_DEFAULTS)
+    user_cfg = {}
 
     try:
         user_cfg = json.loads(path.read_text(encoding="utf-8"))
@@ -179,6 +178,28 @@ def load_config(path: Path | str | None = None) -> dict:
             new_path = Path("assets/fallback") / folder / legacy_path.name
             if (BASE_DIR / new_path).is_file():
                 fallback[field] = new_path.as_posix()
+
+    # Upgrade settings saved by earlier releases without changing their behavior.
+    automation_cfg = cfg.get("pixoo_automations")
+    if isinstance(automation_cfg, dict):
+        stored = user_cfg.get("pixoo_automations", {}) if isinstance(user_cfg, dict) else {}
+        if not isinstance(stored, dict):
+            stored = {}
+        if "turn_on_on_start" not in stored and "turn_on_on_vinyl_start" in stored:
+            automation_cfg["turn_on_on_start"] = bool(stored["turn_on_on_vinyl_start"])
+        automation_cfg.pop("turn_on_on_vinyl_start", None)
+        if "off_action" not in stored and stored.get("play_gif_on_stop") is True:
+            automation_cfg["off_action"] = "community_gif"
+        if automation_cfg.get("off_action") not in ("none", "community_gif", "brightness_off"):
+            automation_cfg["off_action"] = "none"
+        automation_cfg.pop("play_gif_on_stop", None)
+
+    divoom = cfg.get("divoom")
+    if isinstance(divoom, dict):
+        if divoom.get("animation_mode") not in ("stream", "gif_url"):
+            divoom["animation_mode"] = "stream"
+        divoom.pop("native_text_font", None)
+        divoom.pop("native_text_height", None)
 
     cfg["image"] = normalize_image_config(cfg.get("image"))
 
