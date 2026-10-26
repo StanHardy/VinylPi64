@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import threading
 import time
@@ -97,7 +101,7 @@ def _debug(message: str) -> None:
     except Exception:
         enabled = False
     if enabled:
-        print(message)
+        logger.debug(message)
 
 
 def _wait_for_wake(*, require_rearm: bool):

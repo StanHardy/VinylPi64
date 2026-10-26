@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import re
 from typing import Any
@@ -103,7 +107,7 @@ def _recognize(wav_bytes: bytes) -> RecognizedTrack | None:
     timeout_seconds = float((cfg.get("shazam") or {}).get("timeout_seconds", 15))
 
     if debug_log:
-        print("Starting Shazam recognition ...")
+        logger.debug("Starting Shazam recognition ...")
 
     result = recognize_audio(wav_bytes, timeout_seconds=timeout_seconds)
     track = result.get("track") or {}
@@ -119,7 +123,7 @@ def _recognize(wav_bytes: bytes) -> RecognizedTrack | None:
 
     if not cover_url:
         if debug_log:
-            print("No cover image found in Shazam response.")
+            logger.debug("No cover image found in Shazam response.")
         return None
 
     recognized = RecognizedTrack(
@@ -135,11 +139,11 @@ def _recognize(wav_bytes: bytes) -> RecognizedTrack | None:
     )
 
     if debug_log:
-        print(f"Detected: {recognized.artist} – {recognized.title}")
-        print(f"Album: {recognized.album}")
-        print(f"Genre: {recognized.genre}")
-        print(f"Shazam track ID: {recognized.shazam_track_id}")
-        print(f"Cover URL: {recognized.cover_url}")
+        logger.debug(f"Detected: {recognized.artist} – {recognized.title}")
+        logger.debug(f"Album: {recognized.album}")
+        logger.debug(f"Genre: {recognized.genre}")
+        logger.debug(f"Shazam track ID: {recognized.shazam_track_id}")
+        logger.debug(f"Cover URL: {recognized.cover_url}")
 
     return recognized
 
@@ -148,5 +152,5 @@ def recognize_song(wav_bytes: bytes) -> RecognizedTrack | None:
     try:
         return _recognize(wav_bytes)
     except Exception as exc:
-        print(f"Error while detecting: {exc}")
+        logger.exception(f"Error while detecting: {exc}")
         return None

@@ -20,24 +20,51 @@ class LogsTests(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_severity_and_ignoring_access_lines(self):
-        self.assertEqual(logs.classify('No song detected (#30 in a row).'), 'TRACE')
-        self.assertEqual(logs.classify('Recording 3s sample ...'), 'TRACE')
-        self.assertEqual(logs.classify('Spotify API error: request failed'), 'ERROR')
-        self.assertEqual(logs.classify('Could not write status'), 'WARNING')
+    def test_levels_are_explicit_and_access_lines_ignored(self):
         logs.append('127.0.0.1 - - "GET /api/status HTTP/1.1" 200 -')
         self.assertEqual(logs.read_events(level='all'), [])
+        logs.append('Error appears in the text, not the level', level='DEBUG')
+        logs.append('Successful operation', level='ERROR')
+        self.assertEqual([row['level'] for row in logs.read_events(level='all')], ['DEBUG', 'ERROR'])
+        with self.assertRaises(ValueError):
+            logs.append('invalid severity', level='NOT_A_LEVEL')
+
+    def test_handler_respects_explicit_severity(self):
+        import logging
+        record = logging.LogRecord('vinylpi.core.recognition', logging.WARNING, __file__, 1,
+                                   'No song detected: debugging is unrelated to severity', (), None)
+        logs.SQLiteHandler().emit(record)
+        result = logs.read_events(level='issues')
+        self.assertEqual(result[0]['level'], 'WARNING')
+        self.assertEqual(result[0]['source'], 'Vinyl')
+
+    def test_handler_suppresses_debug_when_disabled(self):
+        import logging
+        record = logging.LogRecord('vinylpi.core.audio_capture', logging.DEBUG, __file__, 1,
+                                   'audio detail', (), None)
+        with patch.object(logs, '_debug_enabled', return_value=False):
+            logs.SQLiteHandler().emit(record)
+        self.assertEqual(logs.read_events(level='all'), [])
+        with patch.object(logs, '_debug_enabled', return_value=True):
+            logs.SQLiteHandler().emit(record)
+        self.assertEqual(logs.read_events(level='debug')[0]['message'], 'audio detail')
+
+    def test_legacy_trace_is_read_as_debug(self):
+        logs._connection().execute("INSERT INTO events(timestamp,level,source,message) VALUES (0,'TRACE','Vinyl','older event')")
+        self.assertEqual(logs.read_events(level='debug')[0]['level'], 'DEBUG')
 
     def test_filter_summary_search_and_order(self):
-        logs.append('Recording sample', source='Vinyl')
+        logs.append('Recording sample', level='DEBUG', source='Vinyl')
         logs.append('Sample ready', level='INFO', source='Vinyl')
         logs.append('Broken display connection', level='WARNING', source='Pixoo')
-        logs.append('Spotify API error: rejected', source='Spotify')
+        logs.append('Spotify API error: rejected', level='ERROR', source='Spotify')
         all_rows = logs.read_events(level='all')
-        self.assertEqual([r['level'] for r in all_rows], ['TRACE', 'INFO', 'WARNING', 'ERROR'])
+        self.assertEqual([r['level'] for r in all_rows], ['DEBUG', 'INFO', 'WARNING', 'ERROR'])
         issue_rows = logs.read_events(level='issues')
         self.assertEqual([r['level'] for r in issue_rows], ['WARNING', 'ERROR'])
         self.assertEqual(len(logs.read_events(level='all', search='display')), 1)
+        self.assertEqual([r['level'] for r in logs.read_events(level='info')], ['INFO'])
+        self.assertEqual([r['level'] for r in logs.read_events(level='debug')], ['DEBUG'])
         self.assertEqual(len(logs.read_events(after=all_rows[1]['id'], level='all')), 2)
         self.assertEqual(logs.summary(), {
             'latest_id': all_rows[-1]['id'], 'unread': 2, 'warnings': 1, 'errors': 1,
@@ -46,7 +73,7 @@ class LogsTests(unittest.TestCase):
 
     def test_clear_is_persistent_but_history_is_preserved(self):
         logs.append('old warning - 1', level='WARNING', source='Test')
-        logs.append('old trace - 2', level='TRACE', source='Test')
+        logs.append('old debug - 2', level='DEBUG', source='Test')
         saved = logs.read_events(level='all')
         cutoff = logs.clear_view()
         self.assertEqual(cutoff, saved[-1]['id'])
@@ -76,11 +103,11 @@ class LogsTests(unittest.TestCase):
         self.assertEqual([e['message'] for e in logs.read_events(level='all', include_cleared=False)],
                          ['message after clear'])
 
-    def test_duplicate_error_is_throttled_but_normal_trace_is_not(self):
-        logs.append('Unique API error: code z9', source='Spotify')
-        logs.append('Unique API error: code z9', source='Spotify')
-        logs.append('No song detected (#7 in a row).', source='Vinyl')
-        logs.append('No song detected (#7 in a row).', source='Vinyl')
+    def test_duplicate_issues_are_throttled_but_debug_is_not(self):
+        logs.append('Unique API error: code z9', level='ERROR', source='Spotify')
+        logs.append('Unique API error: code z9', level='ERROR', source='Spotify')
+        logs.append('No song detected (#7 in a row).', level='DEBUG', source='Vinyl')
+        logs.append('No song detected (#7 in a row).', level='DEBUG', source='Vinyl')
         self.assertEqual(len(logs.read_events(level='issues')), 1)
         self.assertEqual(len(logs.read_events(level='all')), 3)
 

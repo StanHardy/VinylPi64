@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import secrets
 from datetime import timedelta
 
@@ -9,7 +10,6 @@ from flask import Flask, g, request, session, got_request_exception
 
 from vinylpi.core.storage import initialize_storage
 from vinylpi.paths import BASE_DIR, DATA_DIR
-from vinylpi.logging_service import append, capture_exception
 from vinylpi.profiles import (
     get_profile_storage_override,
     profile_exists,
@@ -35,6 +35,8 @@ from vinylpi.web.routes.uploads_api import uploads_bp
 
 load_dotenv(BASE_DIR / "vinylpi.env", override=False)
 load_dotenv(BASE_DIR / ".env", override=True)
+
+logger = logging.getLogger(__name__)
 
 _BLUEPRINTS = (
     pages_bp,
@@ -125,12 +127,13 @@ def create_app() -> Flask:
     @app.after_request
     def _log_server_error(response):
         if response.status_code >= 500 and request.path.startswith("/api/"):
-            append(f"{request.method} {request.path} returned HTTP {response.status_code}",
-                   level="ERROR", source="Web API")
+            logger.error("%s %s returned HTTP %s", request.method, request.path,
+                         response.status_code)
         return response
 
     def _log_unhandled_exception(_sender, exception, **_kwargs):
-        capture_exception(exception, source="Web API")
+        logger.error("Unhandled request exception", exc_info=(type(exception), exception,
+                                                           exception.__traceback__))
 
     got_request_exception.connect(_log_unhandled_exception, app, weak=False)
 

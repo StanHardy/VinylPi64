@@ -5,7 +5,7 @@ const vm = require('node:vm');
 const script = fs.readFileSync(require('node:path').join(__dirname, '../vinylpi/web/static/js/pages/logs.js'), 'utf8');
 const events = [
     { id: 1, timestamp: 1792750000, level: 'WARNING', source: 'Test', message: 'Old warning' },
-    { id: 2, timestamp: 1792750100, level: 'TRACE', source: 'Test', message: 'Old trace' },
+    { id: 2, timestamp: 1792750100, level: 'DEBUG', source: 'Test', message: 'Old debug' },
 ];
 let cutoff = 0;
 const storage = new Map();
@@ -67,7 +67,8 @@ function buildBrowser() {
             if (level === 'issues') found = found.filter(e => ['WARNING', 'ERROR'].includes(e.level));
             if (level === 'warnings') found = found.filter(e => e.level === 'WARNING');
             if (level === 'errors') found = found.filter(e => e.level === 'ERROR');
-            if (level === 'trace') found = found.filter(e => e.level === 'TRACE');
+            if (level === 'info') found = found.filter(e => e.level === 'INFO');
+            if (level === 'debug') found = found.filter(e => e.level === 'DEBUG');
             if (!after) found = found.slice(-200);
             return {ok:true, json: async () => ({ok:true, entries:found})};
         }
@@ -95,7 +96,14 @@ const visibleEntries = els => els.logsStream.children.filter(e => e.className ==
     await els.logsLevel.fire('change');
     await settle();
     assert.equal(storage.get('vinylpi.logs.level'), 'all');
-    assert.equal(visibleEntries(els), 2, 'all includes trace');
+    assert.equal(visibleEntries(els), 2, 'all includes debug');
+    els.logsLevel.value = 'debug';
+    await els.logsLevel.fire('change');
+    await settle();
+    assert.equal(visibleEntries(els), 1, 'debug shows only debug messages');
+    els.logsLevel.value = 'all';
+    await els.logsLevel.fire('change');
+    await settle();
     await els.logsClear.fire('click');
     await settle();
     assert.equal(cutoff, 2);

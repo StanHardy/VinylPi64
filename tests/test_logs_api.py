@@ -28,7 +28,7 @@ class LogsApiTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_read_and_summary(self):
-        logs.trace('Recording sample', source='Vinyl')
+        logs.debug('Recording sample', source='Vinyl')
         logs.warning('Missing Pixoo', source='Pixoo')
         logs.error('Spotify API error 500', source='Spotify')
         events = self.client.get('/api/logs').get_json()
@@ -42,7 +42,7 @@ class LogsApiTests(unittest.TestCase):
 
     def test_clear_then_refresh_and_revisit_history(self):
         logs.append('Before clear: warning', level='WARNING', source='Test')
-        logs.append('Before clear: trace', level='TRACE', source='Test')
+        logs.append('Before clear: trace', level='DEBUG', source='Test')
         stored = self.client.get('/api/logs?level=all').get_json()['entries']
         self.assertEqual(len(stored), 2)
         response = self.client.post('/api/logs/clear')

@@ -45,3 +45,13 @@ def readme_logo():
         conditional=True,
         max_age=86400,
     )
+
+
+@pages_bp.get("/assets/readme/Logo.webp")
+def readme_logo_webp():
+    return send_file(
+        BASE_DIR / "assets" / "readme" / "Logo.webp",
+        mimetype="image/webp",
+        conditional=True,
+        max_age=86400,
+    )

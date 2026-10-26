@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import threading
 
@@ -45,7 +49,7 @@ def send_rgb(rgb: tuple[int, int, int]) -> None:
             timeout=2,
         ).raise_for_status()
     except requests.RequestException as exc:
-        print(f"[HA] Failed sending RGB: {exc}")
+        logger.warning(f"[HA] Failed sending RGB: {exc}")
         return
 
     with _lock:

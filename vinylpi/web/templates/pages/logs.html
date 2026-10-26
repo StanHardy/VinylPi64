@@ -1,10 +1,10 @@
 {% extends "layouts/base.html" %}
 {% block title %}Logs – VinylPi64{% endblock %}
 {% block page_styles %}
-<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/logs.css') }}?v=20261023-clean-ui">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages/logs.css') }}?v=20261025-debug">
 {% endblock %}
 {% block page_scripts %}
-<script src="{{ url_for('static', filename='js/pages/logs.js') }}?v=20261023-logs-prefs" defer></script>
+<script src="{{ url_for('static', filename='js/pages/logs.js') }}?v=20261025-explicit-logging" defer></script>
 {% endblock %}
 {% block content %}
 <main class="main">
@@ -26,10 +26,11 @@
                     <span>Show</span>
                     <select id="logsLevel" aria-label="Filter log level">
                         <option value="issues">Warnings &amp; errors</option>
-                        <option value="all">All messages (incl. trace)</option>
+                        <option value="all">All messages</option>
                         <option value="errors">Errors only</option>
                         <option value="warnings">Warnings only</option>
-                        <option value="trace">Trace only</option>
+                        <option value="info">Info only</option>
+                        <option value="debug">Debug only</option>
                     </select>
                 </label>
                 <label class="logs-field logs-search">
@@ -38,7 +39,7 @@
                 </label>
             </div>
             <div class="logs-verbose-wrap">
-                <label class="logs-verbose-toggle"><input type="checkbox" id="logsVerbose" disabled><span>Detailed trace logging</span></label>
+                <label class="logs-verbose-toggle"><input type="checkbox" id="logsVerbose" disabled><span>Detailed debug logging</span></label>
                 <span class="logs-verbose-help" id="logsVerboseHelp" role="status" aria-live="polite"></span>
             </div>
             <div class="logs-actions">

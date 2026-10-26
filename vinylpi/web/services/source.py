@@ -54,7 +54,7 @@ def _fallback_status() -> dict:
     # The Pixoo still receives the configured 64x64 fallback via
     # ``show_fallback_image``. The website uses the dedicated high-resolution
     # project logo instead, so the large dashboard artwork never looks pixelated.
-    logo_path = BASE_DIR / "assets" / "readme" / "Logo.png"
+    logo_path = BASE_DIR / "assets" / "readme" / "Logo.webp"
     try:
         revision = int(logo_path.stat().st_mtime_ns // 1_000_000)
     except OSError:
@@ -66,7 +66,7 @@ def _fallback_status() -> dict:
         "title": "Playback off",
         "album": "",
         "genre": "",
-        "cover_url": "/assets/readme/Logo.png",
+        "cover_url": "/assets/readme/Logo.webp",
         "bg_color": "#2b2b34",
         "track_id": "",
         "artist_id": "",

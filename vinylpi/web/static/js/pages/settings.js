@@ -679,14 +679,14 @@ async function loadDisplayPreviewTrack() {
             renderDisplayPreview();
         };
         image.onerror = () => {
-            if (image.src.endsWith("/static/images/logo.png")) {
+            if (image.src.endsWith("/static/images/logo.webp")) {
                 DISPLAY_PREVIEW_IMAGE_FAILED = true;
                 renderDisplayPreview();
                 return;
             }
-            image.src = "/static/images/logo.png";
+            image.src = "/static/images/logo.webp";
         };
-        image.src = (response.ok && status?.cover_url) ? status.cover_url : "/static/images/logo.png";
+        image.src = (response.ok && status?.cover_url) ? status.cover_url : "/static/images/logo.webp";
     } catch (error) {
         console.debug("Display preview track unavailable", error);
         renderDisplayPreview();

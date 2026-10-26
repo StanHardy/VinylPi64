@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import time
 
@@ -49,7 +53,7 @@ def _display_track(track) -> None:
         bg_color = f"rgb({rgb[0]}, {rgb[1]}, {rgb[2]})"
         send_rgb(rgb)
     except Exception as exc:
-        print(f"[Spotify/HA] Could not compute/send RGB: {exc}")
+        logger.warning(f"[Spotify/HA] Could not compute/send RGB: {exc}")
 
     write_status(
         track.artist,
@@ -112,7 +116,7 @@ def main() -> None:
     debug_log = bool((read_config().get("debug") or {}).get("logs", False))
     start_display_refresh_watcher(debug_log=debug_log)
 
-    print(f"Spotify worker started (polling every {_poll_seconds():g}s).")
+    logger.info(f"Spotify worker started (polling every {_poll_seconds():g}s).")
 
     while True:
         poll_seconds = _poll_seconds()
@@ -139,14 +143,13 @@ def main() -> None:
                 last_progress_ms = None
 
                 auto_sleep_enabled, auto_sleep_iterations = _auto_sleep_settings()
-                if debug_log:
-                    print(
-                        "Spotify idle poll "
-                        f"(#{consecutive_idle_polls}/{auto_sleep_iterations})"
-                    )
+                logger.debug(
+                    "Spotify idle poll (#%s/%s)",
+                    consecutive_idle_polls, auto_sleep_iterations,
+                )
 
                 if auto_sleep_enabled and consecutive_idle_polls >= auto_sleep_iterations:
-                    print("Spotify has been idle for a while, entering sleep mode.")
+                    logger.info("Spotify has been idle for a while, entering sleep mode.")
                     show_fallback_image()
                     on_recognition_stopped(source="spotify", reason="auto_sleep")
                     return
@@ -191,21 +194,21 @@ def main() -> None:
             last_progress_ms = track.progress_ms
 
         except (SpotifyNotConfigured, SpotifyNotAuthorized) as exc:
-            print(f"Spotify worker stopped: {exc}")
+            logger.warning(f"Spotify worker stopped: {exc}")
             show_fallback_image()
             on_recognition_stopped(source="spotify", reason="authorization")
             return
         except SpotifyError as exc:
-            print(f"Spotify API error: {exc}")
+            logger.exception(f"Spotify API error: {exc}")
             time.sleep(max(5.0, poll_seconds))
         except Exception as exc:
-            print(f"Spotify worker error: {exc}")
+            logger.exception(f"Spotify worker error: {exc}")
             time.sleep(max(5.0, poll_seconds))
 
         time.sleep(poll_seconds)
 
 
 if __name__ == "__main__":
-    from vinylpi.logging_service import install_print_capture
-    install_print_capture("Spotify")
+    from vinylpi.logging_service import configure_logging
+    configure_logging("Spotify")
     main()

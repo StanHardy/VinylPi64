@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from vinylpi.core.stats_db import (
     get_current_status,
@@ -83,7 +87,7 @@ def write_status(
         write_current_status(payload)
         write_source_status(payload["source"], payload)
     except Exception as exc:
-        print(f"Could not write status to database: {exc}")
+        logger.exception(f"Could not write status to database: {exc}")
 
 
 def get_last_source_status(source: str) -> dict | None:
@@ -112,7 +116,7 @@ def get_last_source_status(source: str) -> dict | None:
         if current and str(current.get("source") or "").strip().lower() == str(source or "").strip().lower():
             return current
     except Exception as exc:
-        print(f"Could not read source status: {exc}")
+        logger.warning(f"Could not read source status: {exc}")
     return None
 
 
@@ -136,7 +140,7 @@ def write_side_flip_prompt(
         )
         write_current_status(current)
     except Exception as exc:
-        print(f"Could not write side-flip prompt status: {exc}")
+        logger.exception(f"Could not write side-flip prompt status: {exc}")
 
 
 def clear_side_flip_prompt() -> None:
@@ -165,4 +169,4 @@ def clear_side_flip_prompt() -> None:
         )
         write_current_status(current)
     except Exception as exc:
-        print(f"Could not clear side-flip prompt status: {exc}")
+        logger.exception(f"Could not clear side-flip prompt status: {exc}")

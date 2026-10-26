@@ -1,7 +1,12 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import io
 import re
+import threading
 
 import sounddevice as sd
 import soundfile as sf
@@ -132,6 +137,19 @@ def list_audio_input_devices() -> list[dict]:
     return physical or devices
 
 
+_device_lock = threading.RLock()
+_cached_device_key: str | None = None
+_cached_device_index: int | None = None
+
+
+def invalidate_audio_device() -> None:
+    """Re-detect after capture fails or the selected device is changed."""
+    global _cached_device_key, _cached_device_index
+    with _device_lock:
+        _cached_device_key = None
+        _cached_device_index = None
+
+
 def auto_detect_usb_device() -> int | None:
     """Resolve the configured input device while keeping legacy name matching.
 
@@ -142,24 +160,36 @@ def auto_detect_usb_device() -> int | None:
     """
     cfg = read_config()
     configured_name = str(cfg["audio"].get("device_name_contains") or "").strip()
-    debug_log = bool(cfg["debug"].get("logs", False))
+    global _cached_device_key, _cached_device_index
+    with _device_lock:
+        if _cached_device_index is not None and configured_name == _cached_device_key:
+            return _cached_device_index
+        # Forget a former selection before probing the new one. If the new
+        # device is unavailable, returning to the old setting still re-probes.
+        _cached_device_key, _cached_device_index = None, None
+        # Only query PortAudio on worker startup, explicit selection changes,
+        # or after a failed recording (when the cache is invalidated).
+        return _resolve_device(configured_name)
 
+
+def _resolve_device(configured_name: str) -> int | None:
+    global _cached_device_key, _cached_device_index
     try:
         all_devices = _query_audio_input_devices()
     except Exception as exc:
-        print(f"Could not query audio devices: {exc}")
+        logger.warning(f"Could not query audio devices: {exc}")
         return None
 
     if not all_devices:
-        print("No audio input devices are available.")
+        logger.warning("No audio input devices are available.")
         return None
 
     if not configured_name:
         visible_devices = [device for device in all_devices if not device["is_virtual"]] or all_devices
         selected = next((device for device in visible_devices if device["is_default"]), visible_devices[0])
-        if debug_log:
-            print(f"Using audio input: #{selected['index']} -> {selected['name']}")
-        return int(selected["index"])
+        logger.info(f"Using audio input: #{selected['index']} -> {selected['name']}")
+        _cached_device_key, _cached_device_index = configured_name, int(selected["index"])
+        return _cached_device_index
 
     # Resolve saved names against every PortAudio input so older configs that
     # intentionally selected an ALSA alias continue to work even though those
@@ -181,11 +211,11 @@ def auto_detect_usb_device() -> int | None:
         )
 
     if selected is not None:
-        if debug_log:
-            print(f"Using audio input: #{selected['index']} -> {selected['name']}")
-        return int(selected["index"])
+        logger.info(f"Using audio input: #{selected['index']} -> {selected['name']}")
+        _cached_device_key, _cached_device_index = configured_name, int(selected["index"])
+        return _cached_device_index
 
-    print(
+    logger.warning(
         f"Configured audio input '{configured_name}' was not found. "
         "Choose an available input in Settings > Audio."
     )
@@ -217,7 +247,8 @@ def record_sample(seconds_override: float | None = None) -> bytes | None:
         )
         sd.wait()
     except Exception as exc:
-        print(f"Audio recording failed: {exc}")
+        invalidate_audio_device()
+        logger.exception(f"Audio recording failed: {exc}")
         return None
 
     buffer = io.BytesIO()
@@ -228,8 +259,8 @@ def record_sample(seconds_override: float | None = None) -> bytes | None:
         try:
             sf.write(str(debug_output_path(debug_wav_path)), audio, sample_rate, format="WAV")
             if debug_log:
-                print(f"Saved WAV file at: {debug_wav_path}")
+                logger.debug(f"Saved WAV file at: {debug_wav_path}")
         except Exception as exc:
-            print(f"Could not save debug WAV: {exc}")
+            logger.warning(f"Could not save debug WAV: {exc}")
 
     return wav_bytes

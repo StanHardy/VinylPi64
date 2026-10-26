@@ -17,10 +17,11 @@
     const LIMIT = 200;
     const MAX_VISIBLE = 350;
     const LEVEL_KEY = 'vinylpi.logs.level';
-    const validLevels = new Set(['issues', 'all', 'errors', 'warnings', 'trace']);
+    const validLevels = new Set(['issues', 'all', 'errors', 'warnings', 'info', 'debug']);
     try {
         const saved = localStorage.getItem(LEVEL_KEY);
-        if (validLevels.has(saved)) level.value = saved;
+        if (saved === 'trace') level.value = 'debug';
+        else if (validLevels.has(saved)) level.value = saved;
     } catch { /* Private browsing may disable storage. */ }
     function saveLevel() {
         try { localStorage.setItem(LEVEL_KEY, level.value); }

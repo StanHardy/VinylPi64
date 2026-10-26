@@ -1,5 +1,9 @@
 """Local Pixoo actions for VinylPi source transitions (no HA round trip)."""
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from vinylpi.config.runtime import read_config
 from vinylpi.integrations.divoom_api import PixooClient, PixooError
@@ -27,7 +31,7 @@ def on_vinyl_started(*, reason: str = "manual") -> bool:
     try:
         _client(divoom).set_brightness(100)
     except Exception as exc:
-        print(f"[Pixoo automation] Could not turn on Pixoo ({reason}): {exc}")
+        logger.warning(f"[Pixoo automation] Could not turn on Pixoo ({reason}): {exc}")
         return False
     return True
 
@@ -40,6 +44,6 @@ def on_recognition_stopped(*, source: str, reason: str) -> bool:
     try:
         _client(divoom).play_remote_gif(file_id)
     except Exception as exc:
-        print(f"[Pixoo automation] Could not play stop GIF ({source}/{reason}): {exc}")
+        logger.warning(f"[Pixoo automation] Could not play stop GIF ({source}/{reason}): {exc}")
         return False
     return True

@@ -4,12 +4,12 @@
 
 {% block page_styles %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/components/vinyl-loader.css') }}?v=20261022">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261022-spin">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/dashboard.css') }}?v=20261025-logo">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pages/spotify.css') }}">
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20261022-spin" defer></script>
+    <script src="{{ url_for('static', filename='js/pages/dashboard.js') }}?v=20261025-logo" defer></script>
     <script src="{{ url_for('static', filename='js/pages/spotify_dashboard.js') }}?v=20261008a" defer></script>
     <script src="{{ url_for('static', filename='js/pages/random_record.js') }}?v=20261008b" defer></script>
 {% endblock %}
@@ -40,7 +40,7 @@
     <section class="dashboard-shell">
         <section class="song-card">
             <div class="song-art">
-                <img id="song-cover" class="song-cover" src="{{ url_for('static', filename='images/logo.png') }}" alt="Album Cover">
+                <img id="song-cover" class="song-cover" src="{{ url_for('static', filename='images/logo.webp') }}" alt="Album Cover">
             </div>
 
             <div class="song-copy">

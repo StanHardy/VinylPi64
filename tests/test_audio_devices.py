@@ -22,6 +22,11 @@ if Flask is not None and audio_capture is not None:
 
 @unittest.skipIf(audio_capture is None, "sounddevice is not installed")
 class AudioDeviceDiscoveryTests(unittest.TestCase):
+    def setUp(self):
+        audio_capture.invalidate_audio_device()
+        self.addCleanup(audio_capture.invalidate_audio_device)
+
+
     @patch("vinylpi.core.audio_capture._default_input_index", return_value=1)
     @patch("vinylpi.core.audio_capture.sd.query_hostapis")
     @patch("vinylpi.core.audio_capture.sd.query_devices")
@@ -135,11 +140,43 @@ class AudioDeviceDiscoveryTests(unittest.TestCase):
         ]
         self.assertEqual(audio_capture.auto_detect_usb_device(), 4)
 
+        audio_capture.invalidate_audio_device()  # Simulate a new worker start.
         list_devices.return_value = [
             {"index": 1, "name": "Input A", "is_default": False, "is_virtual": False},
             {"index": 4, "name": "Input B", "is_default": False, "is_virtual": False},
         ]
         self.assertEqual(audio_capture.auto_detect_usb_device(), 1)
+
+    @patch("vinylpi.core.audio_capture._query_audio_input_devices")
+    @patch("vinylpi.core.audio_capture.read_config")
+    def test_device_resolved_once_until_selection_changes(self, read_config, query):
+        read_config.return_value = {"audio": {"device_name_contains": "USB"}}
+        query.return_value = [
+            {"index": 0, "name": "USB Interface", "is_default": True, "is_virtual": False},
+            {"index": 1, "name": "Other", "is_default": False, "is_virtual": False},
+        ]
+        for _ in range(20):
+            self.assertEqual(audio_capture.auto_detect_usb_device(), 0)
+        query.assert_called_once()
+        read_config.return_value = {"audio": {"device_name_contains": "Other"}}
+        self.assertEqual(audio_capture.auto_detect_usb_device(), 1)
+        self.assertEqual(query.call_count, 2)
+
+    @patch("vinylpi.core.audio_capture.sf.write")
+    @patch("vinylpi.core.audio_capture.sd.rec", side_effect=RuntimeError("device unplugged"))
+    @patch("vinylpi.core.audio_capture._query_audio_input_devices")
+    @patch("vinylpi.core.audio_capture.read_config")
+    def test_recording_failure_invalidates_cached_device(self, read_config, query, _record, _write):
+        read_config.return_value = {
+            "audio": {"device_name_contains": "", "sample_rate": 44100,
+                      "sample_seconds": 3, "channels": 1},
+            "debug": {"logs": False, "wav_path": ""},
+        }
+        query.return_value = [{"index": 0, "name": "USB", "is_default": True, "is_virtual": False}]
+        self.assertEqual(audio_capture.auto_detect_usb_device(), 0)
+        self.assertIsNone(audio_capture.record_sample())
+        self.assertEqual(audio_capture.auto_detect_usb_device(), 0)
+        self.assertEqual(query.call_count, 2)  # Retry discovery after device failure.
 
     @patch("vinylpi.core.audio_capture.sf.write")
     @patch("vinylpi.core.audio_capture.sd.wait")

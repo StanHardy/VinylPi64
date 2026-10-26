@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import time
 import os
@@ -68,10 +72,10 @@ def _observe_pickup_level(
 
     if debug_log and log_level:
         state = "active" if pickup_tracker.active else "inactive"
-        print(f"Pickup input level: {level_dbfs:.1f} dBFS ({state})")
+        logger.debug(f"Pickup input level: {level_dbfs:.1f} dBFS ({state})")
     if debug_log and pickup_tracker.active != was_active:
         transition = "started" if pickup_tracker.active else "stopped"
-        print(f"Pickup usage tracking {transition}.")
+        logger.debug(f"Pickup usage tracking {transition}.")
 
     return pickup_delta
 
@@ -82,8 +86,7 @@ def main_loop() -> None:
     cfg = LoopConfig.from_config(raw_cfg)
     pickup_tracker = PickupUsageTracker(PickupUsageConfig.from_config(raw_cfg))
     audio_sleep_tracker = LowAudioSleepTracker(VinylAudioSleepConfig.from_config(raw_cfg))
-    if cfg.debug_log:
-        print(f"\nStarting VinylPi64 recognition loop (every {cfg.delay}s)\n")
+    logger.info("Starting VinylPi64 recognition loop (every %ss)", cfg.delay)
 
     display_state = DisplayState()
     album_state = AlbumState()
@@ -112,11 +115,11 @@ def main_loop() -> None:
 
             sample_seconds = cfg.sample_seconds_for_failures(display_state.consecutive_failures)
             if cfg.debug_log:
-                print(f"Recording {sample_seconds:g}s sample ...")
+                logger.debug(f"Recording {sample_seconds:g}s sample ...")
 
             wav_bytes = record_sample(seconds_override=sample_seconds)
             if not wav_bytes:
-                print("No recording possible, trying again in 5s ...")
+                logger.warning("No recording possible, trying again in 5s ...")
                 time.sleep(5)
                 continue
 
@@ -139,12 +142,11 @@ def main_loop() -> None:
 
             if level is not None and audio_sleep_tracker.config.enabled and not manual_sleep_protected:
                 if cfg.debug_log and not pickup_tracker.config.enabled:
-                    print(f"Vinyl input level: {level.dbfs:.1f} dBFS")
+                    logger.debug(f"Vinyl input level: {level.dbfs:.1f} dBFS")
                 if audio_sleep_tracker.observe(level.dbfs, level.duration_seconds):
                     flush_timed_listen_if_needed(cfg, timed_listen_state)
                     timed_listen_state = TimedListenState()
-                    if cfg.debug_log:
-                        print(
+                    logger.info(
                             "Vinyl audio standby reached "
                             f"({level.dbfs:.1f} dBFS <= "
                             f"{audio_sleep_tracker.config.threshold_dbfs:.1f} dBFS for "
@@ -173,7 +175,7 @@ def main_loop() -> None:
                 if should_hold_inferred_track(discogs_state):
                     display_state.consecutive_failures += 1
                     if cfg.debug_log:
-                        print(
+                        logger.debug(
                             "No Shazam match; keeping the Discogs sequence estimate "
                             f"(#{display_state.consecutive_failures})."
                         )
@@ -195,7 +197,7 @@ def main_loop() -> None:
                     side_flip_prompt=side_flip_prompt,
                 ):
                     if cfg.debug_log:
-                        print("Vinyl auto-sleep reached; stopping recognition worker.")
+                        logger.info("Vinyl auto-sleep reached; stopping recognition worker.")
                     stop_reason = "auto_sleep"
                     break
                 time.sleep(cfg.delay)
@@ -222,7 +224,7 @@ def main_loop() -> None:
                 locked_album = album_state.current_album or ""
                 if should_ignore_live_album_mismatch(track.title, track.album, locked_album):
                     if cfg.debug_log:
-                        print(
+                        logger.debug(
                             "Ignoring live/unplugged mismatch: "
                             f"detected album='{track.album}', "
                             f"locked album='{locked_album}', title='{track.title}'"
@@ -282,7 +284,7 @@ def main_loop() -> None:
                 else:
                     timed_listen_state = TimedListenState()
                     if cfg.debug_log:
-                        print(
+                        logger.debug(
                             "Stats guard: confirmed track switch but suppressed a "
                             "recent duplicate play."
                         )
@@ -296,7 +298,7 @@ def main_loop() -> None:
             )
 
         except Exception as exc:
-            print(f"Error in loop: {exc}")
+            logger.exception(f"Error in loop: {exc}")
 
         time.sleep(cfg.delay)
 

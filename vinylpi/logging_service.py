@@ -1,17 +1,15 @@
 """Small, process-safe log store shared by the web, Vinyl and Spotify workers.
 
-Legacy print() calls remain visible in journald, while their useful messages are
-recorded in an independent, bounded SQLite database. No journalctl/sudo access is
-needed and debug messages may be disabled without losing warnings/errors.
+Application modules use explicit standard Python logging levels. A single
+handler mirrors events to SQLite while a console handler writes to journald.
+Neither source text nor keywords determine event severity.
 """
 from __future__ import annotations
 
-import builtins
 import logging
 import os
 import re
 import sqlite3
-import sys
 import threading
 import time
 import traceback
@@ -21,11 +19,13 @@ from vinylpi.paths import DATA_DIR
 
 LOG_PATH = DATA_DIR / "logs.db"
 MAX_EVENTS = 10000
-_LEVELS = {"TRACE", "INFO", "WARNING", "ERROR"}
+_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 _local = threading.local()
-_original_print = builtins.print
-_installed = False
 _install_lock = threading.Lock()
+_DEBUG_CHECK_SECONDS = 1.5
+_debug_checked_at = 0.0
+_debug_checked_value = False
+_debug_lock = threading.Lock()
 _connection_init_lock = threading.Lock()
 _BUSY_RETRY_DELAYS = (0.0, 0.03, 0.08)
 _source = "App"
@@ -39,43 +39,6 @@ _SECRET = re.compile(
     r'([^\s&,;]+)'
 )
 _BEARER = re.compile(r"(?i)\bBearer\s+[A-Za-z0-9._~+/-]+")
-_INFO_NORMAL = re.compile(
-    r'no song detected|no track recognized|no duration found|not confirmed yet|'
-    r'failed iterations|consecutive failures|fallback|failed to match|'
-    r'no cover image found in shazam response', re.I
-)
-_ERROR = re.compile(
-    r'\b(?:error|exception|traceback|critical|fatal)\b|'
-    r'\b(?:request|recording|authentication|authorization) failed\b|'
-    r'\b(?:failed to|failure to) (?:connect|record|write|load|send|read|fetch|start)', re.I
-)
-_WARNING = re.compile(
-    r'\bwarning\b|could not|cannot |can.t |unable to |not reachable|'
-    r'not available|unavailable|no recording possible|no audio input|'
-    r'no appropriate audio|timed? out|connection refused|permission denied|'
-    r'\bmissing\b|\bskipped\b', re.I
-)
-_TRACE = re.compile(
-    r'^\s*(?:recording |using audio input:|pickup input level:|'
-    r'vinyl input level:|starting shazam|starting recognition|'
-    r'no song detected|same song|discogs:|shazam returned|'
-    r'config reloaded|auto-detected|detected:|cover url:|album:|genre:|'
-    r'\s*trying |sample |recognition loop)', re.I
-)
-
-
-def classify(message: str) -> str:
-    if _INFO_NORMAL.search(message) and not _ERROR.search(message):
-        return "TRACE"
-    if _ERROR.search(message):
-        return "ERROR"
-    if _WARNING.search(message):
-        return "WARNING"
-    if _TRACE.search(message):
-        return "TRACE"
-    return "INFO"
-
-
 def _is_busy(exc: sqlite3.OperationalError) -> bool:
     """Retry only transient SQLite lock contention, not unrelated SQL errors."""
     code = getattr(exc, "sqlite_errorcode", None)
@@ -126,19 +89,19 @@ def _connection() -> sqlite3.Connection:
     raise RuntimeError("Could not initialize logging database")
 
 
-def append(message: str, *, level: str | None = None, source: str | None = None) -> None:
+def append(message: str, *, level: str = "INFO", source: str | None = None) -> None:
     """Best-effort logging: never break music playback if logging is unavailable."""
     cleaned = _ANSI.sub("", str(message)).strip(" \r\n\t")
     if not cleaned or _REQUEST_LINE.search(cleaned):
         return
     cleaned = _BEARER.sub("Bearer [redacted]", cleaned)
     cleaned = _SECRET.sub(r"\1[redacted]", cleaned)[:3000]
-    severity = (level or classify(cleaned)).upper()
+    severity = str(level).upper()
     if severity not in _LEVELS:
-        severity = "INFO"
+        raise ValueError(f"Unsupported log level: {severity}")
     key = None
     try:
-        if severity in ("WARNING", "ERROR"):
+        if severity in ("WARNING", "ERROR", "CRITICAL"):
             now = time.monotonic()
             key = ((source or _source), severity, cleaned)
             with _recent_lock:
@@ -183,8 +146,8 @@ def append(message: str, *, level: str | None = None, source: str | None = None)
                     _recent_issues.pop(key, None)
 
 
-def trace(message: str, *, source: str | None = None) -> None:
-    append(message, level="TRACE", source=source)
+def debug(message: str, *, source: str | None = None) -> None:
+    append(message, level="DEBUG", source=source)
 
 
 def info(message: str, *, source: str | None = None) -> None:
@@ -204,67 +167,78 @@ def capture_exception(exc: BaseException, *, source: str | None = None) -> None:
     append(message, level="ERROR", source=source)
 
 
-def _capturing_print(*args, **kwargs):
-    _original_print(*args, **kwargs)
-    output = kwargs.get("file")
-    if output is not None and output not in (sys.stdout, sys.stderr):
-        return
-    sep = kwargs.get("sep", " ")
-    try:
-        message = (" " if sep is None else str(sep)).join(str(a) for a in args)
-    except Exception:
-        return
-    # Avoid capturing transient, carriage-return-only progress messages.
-    if "\r" in str(kwargs.get("end", "\n")):
-        return
-    for line in message.splitlines():
-        append(line)
+def _debug_enabled() -> bool:
+    """Read the live debug setting periodically, without querying on every event."""
+    global _debug_checked_at, _debug_checked_value
+    now = time.monotonic()
+    with _debug_lock:
+        if now - _debug_checked_at > _DEBUG_CHECK_SECONDS:
+            try:
+                from vinylpi.config.runtime import read_config
+                _debug_checked_value = bool((read_config().get("debug") or {}).get("logs", False))
+            except (OSError, KeyError, TypeError, ValueError):
+                _debug_checked_value = False
+            _debug_checked_at = now
+        return _debug_checked_value
 
 
-class _LibraryWarningsHandler(logging.Handler):
-    """Capture warnings from libraries without enabling noisy HTTP access logs."""
+def _source_for(record: logging.LogRecord) -> str:
+    name = record.name
+    if name == "vinylpi.spotify_worker":
+        return "Spotify"
+    if name.startswith("vinylpi.integrations.divoom") or name.startswith("vinylpi.integrations.pixoo"):
+        return "Pixoo"
+    if name.startswith("vinylpi.integrations.home_assistant"):
+        return "Home Assistant"
+    if "discogs" in name:
+        return "Discogs"
+    if name.startswith("vinylpi.web") or name.startswith("flask"):
+        return "Web"
+    if name.startswith("vinylpi.core") or name.startswith("vinylpi.config"):
+        return "Vinyl"
+    return name.rsplit(".", 1)[-1][:50]
 
-    def __init__(self, source: str):
-        super().__init__(level=logging.WARNING)
-        self.source = source
+
+class SQLiteHandler(logging.Handler):
+    """Process-safe storage of records with explicitly assigned severity."""
 
     def emit(self, record: logging.LogRecord) -> None:
         if record.name.startswith("werkzeug"):
+            return  # HTTP access logging is not useful in the dashboard.
+        if record.levelno < logging.INFO and not _debug_enabled():
             return
         try:
-            message = self.format(record)
+            message = record.getMessage()
             if record.exc_info:
                 message += "\n" + "".join(traceback.format_exception(*record.exc_info))
-            append(message, level="ERROR" if record.levelno >= logging.ERROR else "WARNING",
-                   source=self.source)
-        except Exception:
-            pass
+            append(message, level=record.levelname, source=_source_for(record))
+        except (OSError, sqlite3.Error, ValueError):
+            self.handleError(record)
 
 
-def install_print_capture(source: str) -> None:
-    """Call from process entrypoints, not module import or Flask app factory."""
-    global _installed, _source
+def configure_logging(source: str = "App") -> None:
+    """Configure application and third-party loggers once per process.
+
+    No global print interception or text-based severity guessing is used.
+    Called by web, Vinyl and Spotify entrypoints.
+    """
+    global _source
     with _install_lock:
         _source = source
-        if _installed:
-            return
-        builtins.print = _capturing_print
-        logging.getLogger().addHandler(_LibraryWarningsHandler(source))
-        _installed = True
-        original_hook = sys.excepthook
-
-        def exception_hook(exc_type, exc_value, exc_tb):
-            capture_exception(exc_value, source=source)
-            original_hook(exc_type, exc_value, exc_tb)
-
-        sys.excepthook = exception_hook
-        original_thread_hook = threading.excepthook
-
-        def thread_hook(args):
-            capture_exception(args.exc_value, source=source)
-            original_thread_hook(args)
-
-        threading.excepthook = thread_hook
+        app_logger = logging.getLogger("vinylpi")
+        app_logger.setLevel(logging.DEBUG)
+        app_logger.propagate = False
+        if not any(isinstance(handler, SQLiteHandler) for handler in app_logger.handlers):
+            app_logger.addHandler(SQLiteHandler())
+            console = logging.StreamHandler()
+            console.setLevel(logging.INFO)
+            console.setFormatter(logging.Formatter("%(levelname)s [%(name)s] %(message)s"))
+            app_logger.addHandler(console)
+        root = logging.getLogger()
+        if not any(isinstance(handler, SQLiteHandler) for handler in root.handlers):
+            handler = SQLiteHandler()
+            handler.setLevel(logging.WARNING)
+            root.addHandler(handler)
 
 
 def cleared_through() -> int:
@@ -318,10 +292,12 @@ def read_events(*, after: int = 0, limit: int = 200, level: str = "issues",
             where.append("id > ?")
             params.append(watermark)
     levels = {
-        "issues": ("WARNING", "ERROR"),
-        "errors": ("ERROR",),
+        "issues": ("WARNING", "ERROR", "CRITICAL"),
+        "errors": ("ERROR", "CRITICAL"),
         "warnings": ("WARNING",),
-        "trace": ("TRACE",),
+        "info": ("INFO",),
+        "debug": ("DEBUG", "TRACE"),
+        "trace": ("DEBUG", "TRACE"),  # Stored events from older installations.
         "all": None,
     }.get(level, ("WARNING", "ERROR"))
     if levels:
@@ -342,7 +318,8 @@ def read_events(*, after: int = 0, limit: int = 200, level: str = "issues",
         return []
     if not after:
         rows.reverse()
-    return [dict(id=row[0], timestamp=row[1], level=row[2], source=row[3], message=row[4]) for row in rows]
+    return [dict(id=row[0], timestamp=row[1], level="DEBUG" if row[2] == "TRACE" else row[2],
+                 source=row[3], message=row[4]) for row in rows]
 
 
 def summary(since: int = 0) -> dict:
@@ -353,11 +330,11 @@ def summary(since: int = 0) -> dict:
         watermark = cleared_through()
         rows = conn.execute(
             "SELECT level, COUNT(*) FROM events WHERE id > ? "
-            "AND level IN ('WARNING', 'ERROR') GROUP BY level",
+            "AND level IN ('WARNING', 'ERROR', 'CRITICAL') GROUP BY level",
             (max(0, int(since), watermark),),
         ).fetchall()
     except (sqlite3.Error, OSError):
         return {"latest_id": 0, "unread": 0, "warnings": 0, "errors": 0}
     counts = dict(rows)
-    warns, errors = counts.get("WARNING", 0), counts.get("ERROR", 0)
+    warns, errors = counts.get("WARNING", 0), counts.get("ERROR", 0) + counts.get("CRITICAL", 0)
     return {"latest_id": latest, "unread": warns + errors, "warnings": warns, "errors": errors}

@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import math
 import time
@@ -216,7 +220,7 @@ def wait_for_audio_wake(
         device = auto_detect_usb_device()
         if device is None:
             if debug_log:
-                print("Auto-wake monitor could not find the configured audio input; retrying.")
+                logger.warning("Auto-wake monitor could not find the configured audio input; retrying.")
             time.sleep(_RETRY_SECONDS)
             continue
 
@@ -230,7 +234,7 @@ def wait_for_audio_wake(
             ) as stream:
                 if debug_log:
                     state = "armed" if tracker.armed else "waiting to re-arm"
-                    print(
+                    logger.info(
                         "Low-power Vinyl audio monitor active "
                         f"(wake >= {wake_cfg.threshold_dbfs:.1f} dBFS, {state})."
                     )
@@ -243,7 +247,7 @@ def wait_for_audio_wake(
                     wake_cfg = VinylAutoWakeConfig.from_config(raw_cfg)
                     if not wake_cfg.enabled:
                         if bool((raw_cfg.get("debug") or {}).get("logs", False)):
-                            print("Vinyl auto wake disabled; stopping low-power audio monitor.")
+                            logger.info("Vinyl auto wake disabled; stopping low-power audio monitor.")
                         return None
                     tracker.configure(wake_cfg)
                     debug_log = bool((raw_cfg.get("debug") or {}).get("logs", False))
@@ -252,7 +256,7 @@ def wait_for_audio_wake(
                     # capture settings change in the web UI.
                     if _monitor_audio_settings(raw_cfg) != (configured_input, sample_rate, channels):
                         if debug_log:
-                            print("Audio input settings changed; reopening auto-wake monitor.")
+                            logger.info("Audio input settings changed; reopening auto-wake monitor.")
                         break
 
                     raw_audio, overflowed = stream.read(block_frames)
@@ -263,26 +267,26 @@ def wait_for_audio_wake(
                             level_callback(level_dbfs, block_duration, raw_cfg)
                         except Exception as exc:
                             if debug_log:
-                                print(f"Auto-wake level callback failed: {exc}")
+                                logger.warning(f"Auto-wake level callback failed: {exc}")
 
                     woke = tracker.observe(level_dbfs, block_duration)
                     now = time.monotonic()
                     if debug_log and (now - last_debug_at >= _DEBUG_INTERVAL_SECONDS):
                         state = "armed" if tracker.armed else "waiting to re-arm"
                         overflow_note = ", overflow" if overflowed else ""
-                        print(
+                        logger.debug(
                             f"Auto-wake input: {level_dbfs:.1f} dBFS "
                             f"(threshold {wake_cfg.threshold_dbfs:.1f}, {state}{overflow_note})"
                         )
                         last_debug_at = now
 
                     if debug_log and tracker.armed != last_armed:
-                        print("Vinyl auto-wake monitor re-armed after the input became quiet.")
+                        logger.debug("Vinyl auto-wake monitor re-armed after the input became quiet.")
                     last_armed = tracker.armed
 
                     if woke:
                         if debug_log:
-                            print(
+                            logger.info(
                                 f"Vinyl auto wake triggered at {level_dbfs:.1f} dBFS; "
                                 "starting Shazam recognition."
                             )
@@ -292,5 +296,5 @@ def wait_for_audio_wake(
                         )
         except Exception as exc:
             if debug_log:
-                print(f"Low-power audio monitor failed: {exc}; retrying in {_RETRY_SECONDS:g}s.")
+                logger.exception(f"Low-power audio monitor failed: {exc}; retrying in {_RETRY_SECONDS:g}s.")
             time.sleep(_RETRY_SECONDS)

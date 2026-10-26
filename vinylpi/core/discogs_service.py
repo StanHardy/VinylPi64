@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import os
 import re
@@ -335,7 +339,7 @@ class DiscogsSyncManager:
                     detailed_ids.add(release_id)
                 except Exception as exc:
                     failed += 1
-                    print(f"Discogs release {release_id} could not be imported: {exc}")
+                    logger.warning(f"Discogs release {release_id} could not be imported: {exc}")
                 self._progress(index, total, f"Indexed {index} of {total}: {summary['title']}")
 
             delete_releases_not_in(seen_ids)

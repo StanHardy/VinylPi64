@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import base64
 import json
@@ -44,9 +48,9 @@ class PixooClient:
         if discovered != previous_ip:
             try:
                 write_config({"divoom": {"ip": discovered}})
-                print(f"Pixoo IP discovered and saved: {discovered}")
+                logger.info(f"Pixoo IP discovered and saved: {discovered}")
             except Exception as exc:
-                print(f"Warning: could not save Pixoo IP to config: {exc}")
+                logger.warning(f"could not save Pixoo IP to config: {exc}")
         return discovered
 
 

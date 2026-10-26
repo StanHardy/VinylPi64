@@ -1,3 +1,6 @@
+import logging
+logger = logging.getLogger(__name__)
+
 from io import BytesIO
 import colorsys
 
@@ -53,7 +56,7 @@ def _load_font(size: int, font_path: str | None = None) -> ImageFont.FreeTypeFon
     try:
         font = ImageFont.truetype(font_path, size)
     except Exception:
-        print(f'using default font, {font_path} not found')
+        logger.warning(f'using default font, {font_path} not found')
         font = ImageFont.load_default()
 
     _font_cache[cache_key] = font

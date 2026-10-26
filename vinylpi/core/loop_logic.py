@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import time
 from typing import Any
@@ -27,19 +31,16 @@ def log_pixoo_update_reason(
     cfg_reloaded: bool,
     is_same_song: bool,
 ) -> None:
-    if not debug_log:
-        return
-
     if last_display_was_fallback and is_same_song:
-        print("Same song as before after fallback, updating Pixoo.")
+        logger.debug("Same song as before after fallback, updating Pixoo.")
     elif last_display_was_fallback:
-        print("New song detected after fallback, updating Pixoo.")
+        logger.debug("New song detected after fallback, updating Pixoo.")
     elif cfg_reloaded and is_same_song:
-        print("Config changed, updating Pixoo for the same song.")
+        logger.debug("Config changed, updating Pixoo for the same song.")
     elif cfg_reloaded:
-        print("Config changed and a new song was detected, updating Pixoo.")
+        logger.debug("Config changed and a new song was detected, updating Pixoo.")
     else:
-        print("New song detected, updating Pixoo.")
+        logger.info("New song detected, updating Pixoo.")
 
 
 def should_ignore_live_album_mismatch(
@@ -67,7 +68,7 @@ def handle_no_result(
 ) -> bool:
     disp.consecutive_failures += 1
     if cfg.debug_log:
-        print(f"No song detected (#{disp.consecutive_failures} in a row).")
+        logger.debug(f"No song detected (#{disp.consecutive_failures} in a row).")
 
     fallback_due = (
         disp.consecutive_failures >= cfg.fallback_allowed_failures
@@ -79,13 +80,13 @@ def handle_no_result(
 
         if cfg.debug_log:
             if cfg_reloaded and disp.last_display_was_fallback:
-                print("Config changed while in fallback, refreshing fallback display.")
+                logger.debug("Config changed while in fallback, refreshing fallback display.")
             elif use_side_flip:
-                print("Switching to side-flip prompt image.")
+                logger.info("Switching to side-flip prompt image.")
             elif use_normal_fallback:
-                print("Switching to fallback image.")
+                logger.info("Switching to fallback image.")
             else:
-                print("Fallback displays are disabled; keeping the current Pixoo image.")
+                logger.debug("Fallback displays are disabled; keeping the current Pixoo image.")
 
         display_shown = False
         if use_side_flip:
@@ -112,7 +113,7 @@ def handle_no_result(
         disp.last_display_was_inferred = False
 
     if cfg.auto_sleep_enabled and disp.consecutive_failures >= cfg.auto_sleep:
-        print("No song detected for a while, entering sleep mode.")
+        logger.info("No song detected for a while, entering sleep mode.")
         return True
     return False
 
@@ -177,7 +178,7 @@ def handle_song_result(
 
     if track.artist == "UNKNOWN" and track.title == "UNKNOWN":
         if cfg.debug_log:
-            print("Shazam returned UNKNOWN/UNKNOWN, keeping the previous status.")
+            logger.debug("Shazam returned UNKNOWN/UNKNOWN, keeping the previous status.")
         return None
 
     canonical_title = canonicalize_title(track.title)
@@ -204,7 +205,7 @@ def handle_song_result(
 
     if should_skip_pixoo:
         if cfg.debug_log:
-            print("Same song as before, skipping Pixoo update.")
+            logger.debug("Same song as before, skipping Pixoo update.")
         info["did_update_display"] = False
         return info
 
@@ -225,7 +226,7 @@ def handle_song_result(
         send_rgb(rgb)
     except Exception as exc:
         if cfg.debug_log:
-            print(f"[HA] Could not compute/send RGB: {exc}")
+            logger.warning(f"[HA] Could not compute/send RGB: {exc}")
 
     disp.last_song_id = song_id
     disp.last_song_variant_score = score
@@ -276,7 +277,7 @@ def restore_last_vinyl_song(st: StatsSwitchState, *, debug_log: bool = False) ->
 
     st.current_song_id = (artist.casefold(), title.casefold())
     if debug_log:
-        print(f"Restored last Vinyl song for stats guard: {artist} – {title}")
+        logger.debug(f"Restored last Vinyl song for stats guard: {artist} – {title}")
 
 
 def update_song_stats_on_switch(
@@ -443,13 +444,13 @@ def maybe_add_listen_time(
     )
     if cfg.debug_log:
         if result.get("ok"):
-            print(
+            logger.debug(
                 f"Added listen time: +{result['minutes']} min "
                 f"(source={result['source']}, cached={result['cached']}), "
                 f"total={result['total_minutes']} min"
             )
         else:
-            print(f"Listen time not added: {result.get('error')}")
+            logger.warning(f"Listen time not added: {result.get('error')}")
     return result
 
 
@@ -470,12 +471,12 @@ def flush_timed_listen_if_needed(cfg: LoopConfig, st: Any) -> None:
     )
     if cfg.debug_log:
         if result.get("ok"):
-            print(
+            logger.debug(
                 f"Added measured listen time: +{result['minutes']} min "
                 f"(source=measured_timer), total={result['total_minutes']} min"
             )
         else:
-            print(f"Measured listen time not added: {result.get('error')}")
+            logger.warning(f"Measured listen time not added: {result.get('error')}")
 
 
 def start_or_replace_timed_listen(

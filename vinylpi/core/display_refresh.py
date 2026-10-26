@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import os
 import threading
@@ -24,8 +28,7 @@ def _read_refresh_token(*, debug_log: bool = False) -> str | None:
     except FileNotFoundError:
         return None
     except Exception as exc:
-        if debug_log:
-            print(f"Display refresh watcher error: {exc}")
+        logger.warning("Display refresh watcher error: %s", exc)
         return None
 
 
@@ -73,13 +76,13 @@ def start_display_refresh_watcher(*, debug_log: bool = False) -> threading.Threa
                 try:
                     refreshed = refresh_current_display()
                     if debug_log:
-                        print(
+                        logger.debug(
                             "Pixoo display refreshed from current status."
                             if refreshed
                             else "No current display state available for Pixoo refresh."
                         )
                 except Exception as exc:
-                    print(f"Could not refresh current Pixoo display: {exc}")
+                    logger.warning(f"Could not refresh current Pixoo display: {exc}")
 
             time.sleep(0.25)
 

@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import hashlib
 import json
@@ -45,7 +49,7 @@ def _migrate_legacy_statistics_once() -> None:
         source_digest = _sha256(STATS_PATH)
 
         if database_has_statistics():
-            print(
+            logger.info(
                 "Existing SQLite statistics found; preserving them and "
                 "archiving the legacy stats.json without overwriting data."
             )
@@ -55,7 +59,7 @@ def _migrate_legacy_statistics_once() -> None:
                 replace=False,
                 keep_raw_backup=True,
             )
-            print(
+            logger.info(
                 "Migrated legacy stats.json to SQLite: "
                 f"{summary['songs']} songs, {summary['artists']} artists."
             )
@@ -75,7 +79,7 @@ def _migrate_legacy_status_once() -> None:
             write_current_status(status)
         _archive_legacy_file(STATUS_PATH)
     except Exception as exc:
-        print(f"Could not migrate legacy status.json to SQLite: {exc}")
+        logger.exception(f"Could not migrate legacy status.json to SQLite: {exc}")
 
 
 def initialize_storage() -> None:
@@ -95,6 +99,6 @@ def initialize_storage() -> None:
             try:
                 _migrate_legacy_statistics_once()
             except Exception as exc:
-                print(f"Could not migrate legacy stats.json to SQLite: {exc}")
+                logger.exception(f"Could not migrate legacy stats.json to SQLite: {exc}")
             _migrate_legacy_status_once()
         _initialized_paths.add(path_key)

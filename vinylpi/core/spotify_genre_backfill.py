@@ -5,6 +5,10 @@ thread. Work is isolated by profile database and unsuccessful attempts are
 persisted with a retry delay instead of being repeated on each tab switch.
 """
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import threading
 import time
@@ -40,7 +44,7 @@ def request_spotify_genre_backfill(
         try:
             _enrich_missing_genres(path, limit=limit)
         except Exception as exc:
-            print(f"Spotify genre backfill skipped: {exc}")
+            logger.debug(f"Spotify genre backfill skipped: {exc}")
         finally:
             with _lock:
                 _running.discard(key)
@@ -78,4 +82,4 @@ def _enrich_missing_genres(db_path: Path, *, limit: int) -> None:
             if genre:
                 update_spotify_genre(track_id, genre, db_path=db_path)
         except Exception as exc:
-            print(f"Spotify genre lookup failed for {track_id}: {exc}")
+            logger.warning(f"Spotify genre lookup failed for {track_id}: {exc}")

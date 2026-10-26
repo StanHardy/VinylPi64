@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import threading
 import time
@@ -206,7 +210,7 @@ def _scroll_loop(
     try:
         pixoo = _get_pixoo()
     except PixooError as exc:
-        print(f"Pixoo not available or API-error: {exc}")
+        logger.warning(f"Pixoo not available or API-error: {exc}")
         _reset_pixoo_client()
         return
 
@@ -249,7 +253,7 @@ def _scroll_loop(
             if pixoo_frame_path:
                 frame.save(debug_output_path(pixoo_frame_path))
                 if debug_log:
-                    print(f"Finished: {pixoo_frame_path} created.")
+                    logger.debug(f"Finished: {pixoo_frame_path} created.")
             if preview_path:
                 scale = int(img_cfg.get("preview_scale", 8))
                 preview = frame.resize(
@@ -258,14 +262,14 @@ def _scroll_loop(
                 )
                 preview.save(debug_output_path(preview_path))
                 if debug_log:
-                    print(f"Finished: {preview_path} created.")
+                    logger.debug(f"Finished: {preview_path} created.")
             first_frame_saved = True
 
         try:
             pixoo.send_frame(frame)
             last_sent_tick = tick
         except PixooError as exc:
-            print(f"Pixoo not available or API-error: {exc}")
+            logger.warning(f"Pixoo not available or API-error: {exc}")
             _reset_pixoo_client()
             break
 
@@ -302,11 +306,11 @@ def _send_static_frame(frame: Image.Image, *, debug_label: str | None = None) ->
         try:
             _get_pixoo().send_frame(frame)
             if debug_log and debug_label:
-                print(debug_label)
+                logger.debug(debug_label)
             return True
         except Exception as exc:
             _reset_pixoo_client()
-            print(f"Error showing static Pixoo image: {exc}")
+            logger.exception(f"Error showing static Pixoo image: {exc}")
             return False
 
 
@@ -432,7 +436,7 @@ def _load_side_flip_prompt_frame(
             return _overlay_side_letter(frame, next_side)
         except Exception as exc:
             if bool(cfg["debug"]["logs"]):
-                print(f"Could not load side-flip image '{path}': {exc}; using generated prompt.")
+                logger.warning(f"Could not load side-flip image '{path}': {exc}; using generated prompt.")
 
     return _generate_side_flip_prompt_frame(next_side, next_position=next_position)
 
@@ -442,7 +446,7 @@ def show_side_flip_prompt(next_side: str | None, *, next_position: str | None = 
     fallback_cfg = cfg.get("fallback") or {}
     if not bool(fallback_cfg.get("side_flip_enabled", True)):
         if bool(cfg["debug"]["logs"]):
-            print("Turn-record fallback disabled in config, nothing to show.")
+            logger.debug("Turn-record fallback disabled in config, nothing to show.")
         return False
 
     frame = _load_side_flip_prompt_frame(next_side, next_position=next_position)
@@ -455,13 +459,13 @@ def show_fallback_image() -> bool:
     fallback_cfg = cfg.get("fallback") or {}
     if not fallback_cfg.get("enabled", False):
         if debug_log:
-            print("Fallback disabled in config, nothing to show.")
+            logger.debug("Fallback disabled in config, nothing to show.")
         return False
 
     path = fallback_cfg.get("image_path")
     if not path:
         if debug_log:
-            print("Fallback image path not set.")
+            logger.warning("Fallback image path not set.")
         return False
 
     size = int(cfg["image"]["canvas_size"])
@@ -478,5 +482,5 @@ def show_fallback_image() -> bool:
         )
     except Exception as exc:
         _reset_pixoo_client()
-        print(f"Error showing fallback image: {exc}")
+        logger.exception(f"Error showing fallback image: {exc}")
         return False

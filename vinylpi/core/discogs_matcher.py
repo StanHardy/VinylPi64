@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from difflib import SequenceMatcher
 from functools import lru_cache
@@ -352,7 +356,7 @@ def apply_discogs_match(
     score, metrics, best = ranked[0]
     if not _is_plausible(score, metrics, minimum_confidence):
         if debug_log:
-            print(
+            logger.debug(
                 "Discogs: no sufficiently reliable collection match "
                 f"for {track.artist} – {track.title} (best={score:.1f})."
             )
@@ -411,11 +415,11 @@ def apply_discogs_match(
             track.cover_url = collection_cover_url
         except Exception as exc:
             if debug_log:
-                print(f"Discogs: could not load collection cover, keeping Shazam image: {exc}")
+                logger.warning(f"Discogs: could not load collection cover, keeping Shazam image: {exc}")
 
     if debug_log:
         version_note = " version-aware" if metrics.get("variant_overlap") else ""
-        print(
+        logger.debug(
             f"Discogs {source}{version_note} match "
             f"({confidence:.0%}, {best.get('position') or '?'}): "
             f"{original} [release #{release_id}, track {best.get('position') or '?'}]; "
@@ -456,7 +460,7 @@ def discogs_transition_ready(
             if state.current_started_at is not None
             else 0.0
         )
-        print(
+        logger.debug(
             "Stats guard: holding expected next Discogs track "
             f"{track.discogs_position or '?'} after only {elapsed:.0f}s."
         )
@@ -543,7 +547,7 @@ def get_side_flip_prompt(
                 "release_id": state.active_release_id,
             }
             if debug_log:
-                print(
+                logger.debug(
                     "Discogs side-flip prompt: "
                     f"{state.current_side or '?'} -> {next_track.get('side') or '?'} "
                     f"({next_track.get('position') or '?'})"
@@ -576,7 +580,7 @@ def get_side_flip_prompt(
             "release_id": int(status_release_id),
         }
         if debug_log:
-            print(
+            logger.debug(
                 "Discogs side-flip prompt from current status: "
                 f"{current_side or '?'} -> {next_side or '?'} "
                 f"({status.get('discogs_expected_next_position') or '?'})"
@@ -584,7 +588,7 @@ def get_side_flip_prompt(
         return prompt
 
     if debug_log:
-        print(
+        logger.debug(
             "Discogs side-flip prompt not applicable: no paired next side "
             "for the current confirmed release position."
         )
@@ -636,7 +640,7 @@ def infer_expected_next_track(
         cover_image = load_image(str(cover_url))
     except Exception as exc:
         if debug_log:
-            print(f"Discogs: could not load cover for sequence estimate: {exc}")
+            logger.warning(f"Discogs: could not load cover for sequence estimate: {exc}")
         return None
 
     counts = get_track_counts(
@@ -682,7 +686,7 @@ def infer_expected_next_track(
         float(inferred.duration_ms) / 1000.0 if inferred.duration_ms else None
     )
     if debug_log:
-        print(
+        logger.debug(
             "Discogs sequence estimate: "
             f"{inferred.discogs_position or '?'} – {inferred.artist} – {inferred.title}"
         )

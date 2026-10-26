@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import time
 
@@ -60,7 +64,7 @@ def api_discogs_folders():
             save_collection_folder_names(username, folders)
         except (DiscogsError, OSError, ValueError) as exc:
             # Local IDs and counts still work when Discogs is unreachable.
-            print(f"Discogs folder labels unavailable, using local folder IDs: {exc}")
+            logger.warning(f"Discogs folder labels unavailable, using local folder IDs: {exc}")
 
     response = jsonify({"ok": True, "folders": get_collection_folders(username)})
     response.cache_control.no_store = True

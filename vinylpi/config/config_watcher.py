@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from vinylpi.config.runtime import read_config
 from vinylpi.paths import get_active_config_path
@@ -25,7 +29,7 @@ def maybe_log_config_reload() -> bool:
         _last_cfg_signature = signature
         cfg = read_config(force=True)
         if cfg.get("debug", {}).get("logs"):
-            print("Active profile config loaded." if profile_changed else "Config reloaded from disk.")
+            logger.info("Active profile config loaded." if profile_changed else "Config reloaded from disk.")
         return True
 
     return False

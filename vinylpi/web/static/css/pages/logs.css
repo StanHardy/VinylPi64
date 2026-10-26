@@ -31,7 +31,7 @@
 .log-entry[data-level="ERROR"] .log-level { color:#ff8389; }
 .log-entry[data-level="WARNING"] .log-level { color:#ffd177; }
 .log-entry[data-level="INFO"] .log-level { color:#9bc3ff; }
-.log-entry[data-level="TRACE"] .log-level { color:#aaa2bb; }
+.log-entry[data-level="DEBUG"] .log-level { color:#aaa2bb; }
 .log-source { color:var(--muted); font-size:11px; overflow-wrap:anywhere; }
 .log-message { color:#e5e5ed; white-space:pre-wrap; overflow-wrap:anywhere; font-family:ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace; }
 .logs-feedback { min-height:16px; margin:8px 0 0; font-size:12px; color:var(--yellow); }

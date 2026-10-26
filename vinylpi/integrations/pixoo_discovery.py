@@ -5,6 +5,10 @@ configured scan range and is rate limited in each running process to avoid
 repeated subnet scans when a device is offline.
 """
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import ipaddress
@@ -101,7 +105,7 @@ def discover_pixoo_devices(*, manual: bool = False, subnet_prefix: str | None = 
     prefix, start, end, timeout = _scan_parameters(cfg, manual=manual)
     candidates = [f"{prefix}{host}" for host in range(start, end + 1)]
     if (cfg.get("debug") or {}).get("logs"):
-        print(f"Scanning for Pixoo in {prefix}{start}-{end} ({'manual' if manual else 'automatic'})")
+        logger.info(f"Scanning for Pixoo in {prefix}{start}-{end} ({'manual' if manual else 'automatic'})")
 
     devices: list[dict] = []
     with ThreadPoolExecutor(max_workers=min(24, len(candidates)), thread_name_prefix="pixoo-scan") as pool:
@@ -127,7 +131,7 @@ def discover_pixoo_ip() -> str | None:
     try:
         key = _scan_parameters(cfg, manual=False)
     except (ValueError, TypeError) as exc:
-        print(f"Warning: invalid Pixoo discovery configuration: {exc}")
+        logger.warning(f"invalid Pixoo discovery configuration: {exc}")
         return None
     # Includes scan settings in the key so correcting them enables a fresh scan.
     with _discovery_lock:
@@ -137,9 +141,9 @@ def discover_pixoo_ip() -> str | None:
         _last_auto_attempts[key] = now
         devices = discover_pixoo_devices()
     if not devices:
-        print("Warning: Pixoo auto discovery found no device in the configured range.")
+        logger.warning("Pixoo auto discovery found no device in the configured range.")
         return None
     if len(devices) > 1:
-        print("Warning: Multiple Pixoo devices found. Select the correct one in Settings.")
+        logger.warning("Multiple Pixoo devices found. Select the correct one in Settings.")
         return None
     return devices[0]["ip"]

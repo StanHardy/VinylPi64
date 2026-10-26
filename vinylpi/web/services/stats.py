@@ -1,4 +1,8 @@
 from __future__ import annotations
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 import io
 from typing import Any
@@ -39,7 +43,7 @@ def get_top_stats(limit: int = 10) -> dict:
     try:
         return get_ranked_stats(limit=limit)
     except Exception as exc:
-        print(f"Could not load stats from SQLite: {exc}")
+        logger.warning(f"Could not load stats from SQLite: {exc}")
         return _empty_stats_payload()
 
 

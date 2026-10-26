@@ -20,7 +20,7 @@ def api_logs():
     after = _bounded_int(request.args.get("after"), 0, 2**63 - 1)
     limit = _bounded_int(request.args.get("limit"), 150, 300)
     level = request.args.get("level", "issues").lower()
-    if level not in {"issues", "errors", "warnings", "trace", "all"}:
+    if level not in {"issues", "errors", "warnings", "info", "debug", "trace", "all"}:
         return jsonify({"ok": False, "error": "invalid level"}), 400
     entries = read_events(after=after, limit=max(limit, 1), level=level,
                           search=request.args.get("search", ""),
