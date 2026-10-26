@@ -217,7 +217,7 @@ def _scroll_loop(
     try:
         pixoo = _get_pixoo()
     except PixooError as exc:
-        logger.warning(f"Pixoo not available or API-error: {exc}")
+        logger.warning("Pixoo display unavailable: %s", exc)
         _reset_pixoo_client()
         return
 
@@ -307,7 +307,7 @@ def _scroll_loop(
             pixoo.send_frame(frame)
             last_sent_tick = tick
         except PixooError as exc:
-            logger.warning(f"Pixoo not available or API-error: {exc}")
+            logger.warning("Pixoo display unavailable: %s", exc)
             _reset_pixoo_client()
             break
 
@@ -347,9 +347,15 @@ def _send_static_frame(frame: Image.Image, *, debug_label: str | None = None) ->
             if debug_log and debug_label:
                 logger.debug(debug_label)
             return True
-        except Exception as exc:
+        except PixooError as exc:
+            # An offline/unconfigured display is an expected runtime condition,
+            # not a programming error. Keep user-facing logs readable.
             _reset_pixoo_client()
-            logger.exception(f"Error showing static Pixoo image: {exc}")
+            logger.warning("Pixoo display unavailable: %s", exc)
+            return False
+        except Exception:
+            _reset_pixoo_client()
+            logger.exception("Unexpected error showing static Pixoo image")
             return False
 
 
@@ -519,7 +525,11 @@ def show_fallback_image() -> bool:
             fallback_resized,
             debug_label=f"Fallback image '{path}' sent to Pixoo.",
         )
-    except Exception as exc:
+    except PixooError as exc:
         _reset_pixoo_client()
-        logger.exception(f"Error showing fallback image: {exc}")
+        logger.warning("Pixoo fallback unavailable: %s", exc)
+        return False
+    except Exception:
+        _reset_pixoo_client()
+        logger.exception("Unexpected error preparing Pixoo fallback image")
         return False

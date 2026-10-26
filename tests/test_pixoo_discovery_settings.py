@@ -99,6 +99,23 @@ class PixooSelectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pixoo_discovery.discover_pixoo_devices(manual=True, subnet_prefix="8.8.8.")
 
+    @patch("vinylpi.integrations.divoom_api.discover_pixoo_ip", return_value=None)
+    @patch("vinylpi.integrations.divoom_api.read_config")
+    def test_new_profile_without_pixoo_has_readable_error(self, read, discover):
+        read.return_value = {**self.cfg, "divoom": {**self.cfg["divoom"], "ip": ""}}
+        with self.assertRaisesRegex(PixooError, "Pixoo not found on the local network"):
+            PixooClient()
+        discover.assert_called_once()
+
+    @patch("vinylpi.integrations.divoom_api.discover_pixoo_ip")
+    @patch("vinylpi.integrations.divoom_api.read_config")
+    def test_no_device_and_disabled_discovery_is_not_configured(self, read, discover):
+        read.return_value = {**self.cfg, "divoom": {**self.cfg["divoom"],
+            "ip": "", "discovery": {"enabled": False}}}
+        with self.assertRaisesRegex(PixooError, "Pixoo not configured"):
+            PixooClient()
+        discover.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

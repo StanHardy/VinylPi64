@@ -172,5 +172,38 @@ class PixooUnchangedFrameTests(unittest.TestCase):
             self.assertFalse(thread.is_alive())
 
 
+class PixooErrorHandlingTests(unittest.TestCase):
+    def test_missing_device_logs_warning_without_traceback(self):
+        from unittest.mock import patch
+        from vinylpi.core import display
+        from vinylpi.integrations.divoom_api import PixooError
+
+        config = {"debug": {"logs": True}}
+        with patch.object(display, "read_config", return_value=config), \
+             patch.object(display, "stop_scrolling_display"), \
+             patch.object(display, "_get_pixoo", side_effect=PixooError("Pixoo not found")), \
+             patch.object(display.logger, "warning") as warning, \
+             patch.object(display.logger, "exception") as exception:
+            self.assertFalse(display._send_static_frame(Image.new("RGB", (64, 64))))
+
+        warning.assert_called_once_with("Pixoo display unavailable: %s", unittest.mock.ANY)
+        exception.assert_not_called()
+
+    def test_unexpected_display_error_is_still_diagnosed(self):
+        from unittest.mock import patch
+        from vinylpi.core import display
+
+        config = {"debug": {"logs": True}}
+        with patch.object(display, "read_config", return_value=config), \
+             patch.object(display, "stop_scrolling_display"), \
+             patch.object(display, "_get_pixoo", side_effect=RuntimeError("unexpected")), \
+             patch.object(display.logger, "warning") as warning, \
+             patch.object(display.logger, "exception") as exception:
+            self.assertFalse(display._send_static_frame(Image.new("RGB", (64, 64))))
+
+        warning.assert_not_called()
+        exception.assert_called_once_with("Unexpected error showing static Pixoo image")
+
+
 if __name__ == "__main__":
     unittest.main()

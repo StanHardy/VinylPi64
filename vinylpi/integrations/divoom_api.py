@@ -34,6 +34,12 @@ class PixooClient:
         self._auto_discover = bool(auto_discover)
         self.ip = str(ip or cfg_ip).strip()
         if not self.ip and self._auto_discover:
+            # A new profile may have neither a saved device nor discovery enabled.
+            discovery = divoom_cfg.get("discovery") or {}
+            if not discovery.get("enabled", True):
+                raise PixooError(
+                    "Pixoo not configured. Select a device in Settings > Pixoo & Network."
+                )
             # First-time setup: discover only when there is no saved IP.
             self.ip = self._discover_and_save(previous_ip="")
         self.base_url = f"http://{self.ip}/post" if self.ip else ""
@@ -42,8 +48,8 @@ class PixooClient:
         discovered = discover_pixoo_ip()
         if not discovered:
             raise PixooError(
-                "Pixoo not reachable; no device found by automatic discovery "
-                "(or scan cooldown active). Check Settings > Pixoo & Network."
+                "Pixoo not found on the local network. "
+                "Check the device or select it in Settings > Pixoo & Network."
             )
         if discovered != previous_ip:
             try:
@@ -105,20 +111,25 @@ class PixooClient:
 
     def _post(self, payload: dict) -> dict:
         if not self.base_url:
-            raise PixooError("Pixoo IP is not configured for local commands")
+            raise PixooError("Pixoo not configured. Select a device in Settings > Pixoo & Network.")
         try:
             resp = requests.post(self.base_url, json=payload, timeout=self.timeout)
             resp.raise_for_status()
         except (requests.ConnectionError, requests.Timeout) as exc:
             if not self._auto_discover:
-                raise PixooError(f"Pixoo at {self.ip} is not reachable: {exc}") from exc
+                raise PixooError(
+                    f"Pixoo not reachable at {self.ip}. Check its network connection."
+                ) from exc
             # A *real* network failure is the fallback trigger. Never scan
             # merely because a PixooClient was instantiated or polled.
             old_ip = self.ip
             try:
                 new_ip = self._discover_and_save(previous_ip=old_ip)
             except PixooError as discovery_exc:
-                raise PixooError(f"Pixoo at {old_ip} is not reachable: {exc}; {discovery_exc}") from exc
+                raise PixooError(
+                    f"Pixoo not reachable at {old_ip}; automatic discovery also failed. "
+                    "Check Settings > Pixoo & Network."
+                ) from discovery_exc
             self.ip = new_ip
             self.base_url = f"http://{new_ip}/post"
             try:
